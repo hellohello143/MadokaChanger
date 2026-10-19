@@ -1,4 +1,4 @@
-
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -20,6 +20,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MadokaChanger.Verify", "tools\MadokaChanger.Verify\MadokaChanger.Verify.csproj", "{7B92C2E8-8F8F-44A2-92AA-F2D595AB044C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MadokaChanger.UiVerify", "tools\MadokaChanger.UiVerify\MadokaChanger.UiVerify.csproj", "{ECEA506A-3514-400F-B2B7-19D77BD4B23D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MadokaChanger.Uninstaller", "tools\MadokaChanger.Uninstaller\MadokaChanger.Uninstaller.csproj", "{901872C6-A25A-4AB1-9262-5FE0FD5FCD09}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -103,6 +105,18 @@ Global
 		{ECEA506A-3514-400F-B2B7-19D77BD4B23D}.Release|x64.Build.0 = Release|Any CPU
 		{ECEA506A-3514-400F-B2B7-19D77BD4B23D}.Release|x86.ActiveCfg = Release|Any CPU
 		{ECEA506A-3514-400F-B2B7-19D77BD4B23D}.Release|x86.Build.0 = Release|Any CPU
+		{901872C6-A25A-4AB1-9262-5FE0FD5FCD09}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{901872C6-A25A-4AB1-9262-5FE0FD5FCD09}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{901872C6-A25A-4AB1-9262-5FE0FD5FCD09}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{901872C6-A25A-4AB1-9262-5FE0FD5FCD09}.Debug|x64.Build.0 = Debug|Any CPU
+		{901872C6-A25A-4AB1-9262-5FE0FD5FCD09}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{901872C6-A25A-4AB1-9262-5FE0FD5FCD09}.Debug|x86.Build.0 = Debug|Any CPU
+		{901872C6-A25A-4AB1-9262-5FE0FD5FCD09}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{901872C6-A25A-4AB1-9262-5FE0FD5FCD09}.Release|Any CPU.Build.0 = Release|Any CPU
+		{901872C6-A25A-4AB1-9262-5FE0FD5FCD09}.Release|x64.ActiveCfg = Release|Any CPU
+		{901872C6-A25A-4AB1-9262-5FE0FD5FCD09}.Release|x64.Build.0 = Release|Any CPU
+		{901872C6-A25A-4AB1-9262-5FE0FD5FCD09}.Release|x86.ActiveCfg = Release|Any CPU
+		{901872C6-A25A-4AB1-9262-5FE0FD5FCD09}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -114,5 +128,6 @@ Global
 		{A201F497-509F-4940-8FAC-0EF7293C0B89} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{7B92C2E8-8F8F-44A2-92AA-F2D595AB044C} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
 		{ECEA506A-3514-400F-B2B7-19D77BD4B23D} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
+		{901872C6-A25A-4AB1-9262-5FE0FD5FCD09} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
 	EndGlobalSection
 EndGlobal

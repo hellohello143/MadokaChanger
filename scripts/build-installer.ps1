@@ -1,5 +1,5 @@
-param(
-    [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version='1.0.1',
+﻿param(
+    [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version='1.1.0',
     [string]$CompilerPath=$env:INNO_SETUP_COMPILER,
     [string]$PublishDirectory,
     [string]$OutputDirectory

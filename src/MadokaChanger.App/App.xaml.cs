@@ -19,6 +19,7 @@ public partial class App : Application
     {
         base.OnStartup(e);
         var root=Environment.GetEnvironmentVariable("MADOKACHANGER_DATA_ROOT")??Environment.GetEnvironmentVariable("SOULGEM_DATA_ROOT");
+        if(e.Args.Contains("--install-ltk",StringComparer.OrdinalIgnoreCase)){_=InstallLtkHeadlessAsync(string.IsNullOrWhiteSpace(root)?null:root);return;}
         var identity=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(string.IsNullOrWhiteSpace(root)?AppPaths.ResolveDefaultRoot():root).ToLowerInvariant())));
         instance=new Mutex(true,"Local\\SoulGem-"+identity,out var ownsInstance); // Retain the legacy lock for shared upgraded data.
         if(!ownsInstance){instance.Dispose();instance=null;MessageBox.Show("MadokaChanger is already running for this data folder.","MadokaChanger");Shutdown();return;}
@@ -35,9 +36,31 @@ public partial class App : Application
             .AddSingleton<RemoteClient>().AddSingleton<StateStore>().AddSingleton<LibraryStore>().AddSingleton<OperationGate>()
             .AddSingleton<MetadataProvider>().AddSingleton<ImageCache>().AddSingleton<IRepositorySource,GitHubRepository>()
             .AddSingleton<NativeBridge>().AddSingleton<PackageValidator>().AddSingleton<LibraryInstaller>()
-            .AddSingleton<CustomSkinService>().AddSingleton<IGameEnvironment,SystemGameEnvironment>().AddSingleton<PatcherController>().AddSingleton<MainViewModel>().AddSingleton<MainWindow>();
+            .AddSingleton<CustomSkinService>().AddSingleton<IGameEnvironment,SystemGameEnvironment>().AddSingleton<PatcherController>()
+            .AddSingleton<UpdateService>().AddSingleton<LeagueClientApi>().AddSingleton<MainViewModel>().AddSingleton<MainWindow>();
         Services=services.BuildServiceProvider();
         return Services;
+    }
+    /// <summary>
+    /// Run by the installer: installs LTK Manager when it's missing or has no signed patcher, with no window.
+    /// Exit 0 = ready (already there or installed), 2 = the administrator prompt was declined, 1 = failed.
+    /// </summary>
+    private async Task InstallLtkHeadlessAsync(string? root)
+    {
+        var code=1;
+        try
+        {
+            CreateServices(root);var updates=Services.GetRequiredService<UpdateService>();var log=Services.GetRequiredService<ILogger<App>>();
+            if(LtkInstall.Detect().PatcherSigned){log.LogInformation("Installer dependency step: LTK Manager already present");code=0;}
+            else
+            {
+                var release=await updates.LatestAsync(UpdateService.LtkRepository,CancellationToken.None);
+                log.LogInformation("Installer dependency step: {Result}",await updates.InstallLtkAsync(release,null,CancellationToken.None));code=0;
+            }
+        }
+        catch(OperationCanceledException){code=2;}
+        catch(Exception ex){Services?.GetService<ILogger<App>>()?.LogError(ex,"Installer dependency step failed");code=1;}
+        Shutdown(code);
     }
     protected override void OnExit(ExitEventArgs e) {Services?.Dispose();if(instance is not null){instance.ReleaseMutex();instance.Dispose();}base.OnExit(e);}
 }

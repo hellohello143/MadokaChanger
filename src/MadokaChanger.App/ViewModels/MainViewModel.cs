@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.Net.Http;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -53,8 +54,11 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly PatcherController patcher;
     private readonly NativeBridge native;
     private readonly AppPaths paths;
+    private readonly UpdateService updates;
+    private readonly LeagueClientApi leagueClient;
     private readonly ILogger<MainViewModel> log;
     private Catalog? catalog;
+    private UpdateReport? updateReport;
     private CancellationTokenSource? operation;
     private List<ChampionCard> allChampions=[];
     private int columns=6;
@@ -124,12 +128,14 @@ public sealed partial class MainViewModel : ObservableObject
     public string ChampionCount=>$"{allChampions.Count} champions · {catalog?.Patch??"metadata unavailable"}";
     public string ResultCount=>$"{ChampionRows.Sum(r=>r.Champions.Count)} champions";
     public string LibraryVersion=>library.Manifest is { } m ? $"Library {m.Commit[..8]} · {m.Packages.Count:N0} packages":"Skin library not installed";
-    public string UpdateLabel=>library.Manifest is null?"↓  Install Skin Library":"↻  Update";
+    public string UpdateLabel=>updateReport is { } r && (r.AppUpdateAvailable||r.LtkActionNeeded)?"↻  Update available":library.Manifest is null?"↓  Install Skin Library":"↻  Update";
+    public string AppVersionText=>$"Independent fan project · v{UpdateService.CurrentVersion.ToString(3)}";
     public bool BackendReady=>native.BackendAvailable;
     public string PatcherLabel=>patcher.Status.State==PatcherState.Stopped&&!BackendReady?"Unavailable":patcher.Status.State.ToString();
     public string PatcherDetail=>patcher.Status.Message;
     public string GameStatus=>GameLocator.Validate(Store.State.Settings.GameFolder)?"League installation found":"League folder needed";
-    public string DependencyStatus=>$"Built-in backend: {(BackendReady?"ready — no setup needed":"incomplete — extract the full MadokaChanger download again")}\nPatcher: {native.PatcherDescription}\nMetadata: {catalog?.Patch??"unavailable"} / {catalog?.Language??Language}";
+    public string DependencyStatus=>(updateReport?.Summary??$"MadokaChanger v{UpdateService.CurrentVersion.ToString(3)} · press Update to check for new versions\nLTK Manager {LtkInstall.Detect().Display}")+
+        $"\nBuilt-in backend: {(BackendReady?"ready":"incomplete, reinstall MadokaChanger")}\nPatcher: {native.PatcherDescription}\nMetadata: {catalog?.Patch??"unavailable"} / {catalog?.Language??Language}";
     public bool CanUpdate=>!IsBusy&&!patcher.IsActive&&catalog is not null;
     public bool CanStart=>!IsBusy&&!patcher.IsActive&&BackendReady&&GameLocator.Validate(Store.State.Settings.GameFolder);
     public bool CanStop=>patcher.IsActive || patcher.Status.State==PatcherState.Error;
@@ -163,9 +169,9 @@ public sealed partial class MainViewModel : ObservableObject
     public string SelectedCustomDetails=>SelectedCustom is { } c?$"{c.Name}\n{c.Model.Description}\n\n{c.Model.FileName}\n{c.Model.Overrides.Count:N0} file overrides · SHA-256 {c.Model.Sha256}\n\n{c.Status}":"Select an imported skin to inspect its package and conflicts.";
     public string CustomCount=>$"{CustomSkins.Count} imported skins";
     public string ConflictSummary { get { try {var conflicts=ConflictResolver.Find(patcher.Sources());return conflicts.Count==0?"No enabled file conflicts":$"{conflicts.Count:N0} file conflicts · choose a priority or disable conflicting skins";} catch(InvalidOperationException e) {return e.Message;} } }
-    public MainViewModel(StateStore store,MetadataProvider metadata,LibraryStore library,LibraryInstaller installer,CustomSkinService custom,PatcherController patcher,NativeBridge native,AppPaths paths,ILogger<MainViewModel> log)
+    public MainViewModel(StateStore store,MetadataProvider metadata,LibraryStore library,LibraryInstaller installer,CustomSkinService custom,PatcherController patcher,NativeBridge native,AppPaths paths,UpdateService updates,LeagueClientApi leagueClient,ILogger<MainViewModel> log)
     {
-        Store=store;this.metadata=metadata;this.library=library;this.installer=installer;this.custom=custom;this.patcher=patcher;this.native=native;this.paths=paths;this.log=log;
+        Store=store;this.metadata=metadata;this.library=library;this.installer=installer;this.custom=custom;this.patcher=patcher;this.native=native;this.paths=paths;this.updates=updates;this.leagueClient=leagueClient;this.log=log;
         patcher.StatusChanged+=s=>Application.Current.Dispatcher.InvokeAsync(()=> { OnPropertyChanged(nameof(PatcherLabel));OnPropertyChanged(nameof(PatcherDetail));NotifyActions();OnPropertyChanged(nameof(ActiveText)); });
     }
     public async Task InitializeAsync()
@@ -182,6 +188,20 @@ public sealed partial class MainViewModel : ObservableObject
             await Store.SaveAsync(ct); NotifyLibrary();
         });
         OnPropertyChanged(nameof(DependencyStatus)); OnPropertyChanged(nameof(GameStatus));
+        _=CheckUpdatesQuietlyAsync();
+    }
+    /// <summary>One background check at launch so the Update button and Settings show what's new, without installing anything.</summary>
+    private async Task CheckUpdatesQuietlyAsync()
+    {
+        try
+        {
+            updateReport=await updates.CheckAsync(CancellationToken.None);
+            OnPropertyChanged(nameof(UpdateLabel));OnPropertyChanged(nameof(DependencyStatus));
+            if(HasError||IsBusy)return;
+            if(updateReport.LtkMissing){Message="LTK Manager isn't installed, so League will block skins. Press Update to install it.";HasError=false;}
+            else if(updateReport.AppUpdateAvailable||updateReport.LtkUpdateAvailable){Message="An update is available. Press Update to install it.";HasError=false;}
+        }
+        catch(Exception e){log.LogWarning(e,"Launch update check failed");}
     }
     private void PopulateChampions()
     {
@@ -280,7 +300,7 @@ public sealed partial class MainViewModel : ObservableObject
     private void NotifyPreview()
     {
         foreach(var p in new[]{nameof(SkinName),nameof(Splash),nameof(ChromaPreview),nameof(VariantName),nameof(HasChromas),nameof(HasForms),nameof(HasChromaPreview),nameof(CanApply),nameof(AvailabilityText),nameof(SavedText),nameof(ActiveText)})OnPropertyChanged(p);
-        ApplySelectionCommand.NotifyCanExecuteChanged();
+        ApplySelectionCommand.NotifyCanExecuteChanged();SetProfileBackgroundCommand.NotifyCanExecuteChanged();
     }
     private void NotifyActions()
     {
@@ -331,10 +351,49 @@ public sealed partial class MainViewModel : ObservableObject
         if(!await PersistAsync()){if(old is not null)Store.State.Selections[id]=old;NotifyPreview();return;}
         SelectedSkin=Skins.FirstOrDefault(s=>s.Model.IsBase);foreach(var c in allChampions)c.Refresh();if(SavedOnly)Refilter();NotifyPreview();RefreshCustom();Message="Champion override removed. "+ActiveText;HasError=false;
     }
+    /// <summary>
+    /// One button for everything: installs or updates LTK Manager, offers a newer MadokaChanger, then refreshes the skin library.
+    /// </summary>
     [RelayCommand(CanExecute=nameof(CanUpdate))] private async Task UpdateAsync()=>await RunAsync(async ct=>
     {
-        Message=await installer.InstallAsync(catalog!,new Progress<TransferProgress>(p=> {Activity=p.Display;Progress=p.Percent;}),ct);NotifyLibrary();
+        var steps=new Progress<string>(p=>Activity=p);var notes=new List<string>();
+        Activity="Checking MadokaChanger and LTK Manager releases";
+        updateReport=await updates.CheckAsync(ct);OnPropertyChanged(nameof(DependencyStatus));OnPropertyChanged(nameof(UpdateLabel));
+        if(updateReport.Problem is { } problem)notes.Add(problem);
+        if(updateReport.LtkActionNeeded)
+        {
+            try{notes.Add(await updates.InstallLtkAsync(updateReport.LtkLatest!,steps,ct));}
+            catch(OperationCanceledException e) when(!ct.IsCancellationRequested){notes.Add(e.Message);}
+            catch(Exception e) when(e is IOException or InvalidDataException or HttpRequestException or TimeoutException){log.LogError(e,"LTK Manager install failed");notes.Add("LTK Manager wasn't installed: "+e.Message);}
+            updateReport=updateReport with{Ltk=LtkInstall.Detect()};OnPropertyChanged(nameof(DependencyStatus));NotifyLibrary();
+        }
+        if(updateReport.AppUpdateAvailable && updateReport.AppLatest is { } latest &&
+           MessageBox.Show($"MadokaChanger {latest.Version.ToString(3)} is available (you have {UpdateService.CurrentVersion.ToString(3)}).\n\nUpdate now? MadokaChanger closes, installs the update and reopens. Your skins and settings stay.","MadokaChanger update",MessageBoxButton.YesNo,MessageBoxImage.Information)==MessageBoxResult.Yes)
+        {
+            var setup=await updates.DownloadAppUpdateAsync(latest,steps,ct);
+            Message=$"Installing MadokaChanger {latest.Version.ToString(3)}. It reopens when it's done.";
+            UpdateService.LaunchAppSetup(setup);
+            _=Application.Current.Dispatcher.InvokeAsync(()=>Application.Current.MainWindow?.Close());
+            return;
+        }
+        Activity="Checking the skin library";
+        notes.Insert(0,await installer.InstallAsync(catalog!,new Progress<TransferProgress>(p=> {Activity=p.Display;Progress=p.Percent;}),ct));
+        Message=string.Join(" · ",notes);NotifyLibrary();OnPropertyChanged(nameof(UpdateLabel));
     });
+    public bool CanSetProfileBackground=>SelectedSkin is not null && CurrentChampion is not null;
+    /// <summary>Forked from league-profile-tool: sets the League profile background to the previewed skin's splash.</summary>
+    [RelayCommand(CanExecute=nameof(CanSetProfileBackground))] private async Task SetProfileBackgroundAsync()
+    {
+        if(SelectedSkin is not { } skin)return;
+        try
+        {
+            Activity="Setting profile background";
+            await leagueClient.SetProfileBackgroundAsync(skin.Model.Id,Store.State.Settings.GameFolder,CancellationToken.None);
+            Message=$"Profile background set to {skin.Name}. Open your profile in the League client to see it.";HasError=false;
+        }
+        catch(Exception e) when(e is InvalidOperationException or InvalidDataException or ArgumentOutOfRangeException or TaskCanceledException){ShowError(e);}
+        finally{Activity="Ready";}
+    }
     [RelayCommand(CanExecute=nameof(CanStart))] private async Task StartAsync()=>await RunAsync(async ct=>
     {
         await patcher.StartAsync(new Progress<string>(p=>Activity=p),ct);Message=patcher.Status.Message;OnPropertyChanged(nameof(ActiveText));

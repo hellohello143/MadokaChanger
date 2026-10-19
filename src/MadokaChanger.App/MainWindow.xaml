@@ -49,11 +49,20 @@
     </MultiDataTrigger>
    </Style.Triggers>
   </Style>
-  <Style x:Key="BrandHeader" TargetType="StackPanel">
-   <Setter Property="HorizontalAlignment" Value="Left" />
+  <Style x:Key="BrandMascotSize" TargetType="Image">
+   <Setter Property="Width" Value="168" />
+   <Setter Property="Height" Value="168" />
+   <Setter Property="Margin" Value="0,14,0,0" />
    <Style.Triggers>
+    <DataTrigger Binding="{Binding ShortLayout}" Value="True">
+     <Setter Property="Width" Value="112" />
+     <Setter Property="Height" Value="112" />
+     <Setter Property="Margin" Value="0,10,0,0" />
+    </DataTrigger>
     <DataTrigger Binding="{Binding CompactLayout}" Value="True">
-     <Setter Property="HorizontalAlignment" Value="Center" />
+     <Setter Property="Width" Value="44" />
+     <Setter Property="Height" Value="44" />
+     <Setter Property="Margin" Value="0" />
     </DataTrigger>
    </Style.Triggers>
   </Style>
@@ -124,17 +133,15 @@
    <Grid Margin="{Binding SidebarMargin}">
     <Grid.RowDefinitions>
      <RowDefinition Height="Auto" />
-     <RowDefinition Height="50" />
+     <RowDefinition Height="28" />
      <RowDefinition Height="Auto" />
      <RowDefinition Height="*" />
      <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
-    <StackPanel>
-     <StackPanel Orientation="Horizontal" Margin="0,0,0,10" Style="{StaticResource BrandHeader}">
-      <Image x:Name="BrandMascot" Source="Assets/MadokaChibi.png" Width="36" Height="40" Margin="0" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="Madoka chibi" />
-      <TextBlock Text="MadokaChanger" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,0,0" Style="{StaticResource WideOnly}" />
-     </StackPanel>
-     <TextBlock Text="MADOKA SKIN ATELIER" FontSize="9" Foreground="{StaticResource MutedBrush}" Margin="3,0,0,0" Style="{StaticResource WideOnly}" />
+    <StackPanel HorizontalAlignment="Center">
+     <TextBlock Text="MadokaChanger" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" Style="{StaticResource WideOnly}" />
+     <TextBlock Text="MADOKA SKIN ATELIER" FontSize="9" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center" Margin="0,4,0,0" Style="{StaticResource WideOnly}" />
+     <Image x:Name="BrandMascot" Source="Assets/MadokaChibi.png" Stretch="Uniform" HorizontalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="Madoka chibi" Style="{StaticResource BrandMascotSize}" />
     </StackPanel>
     <StackPanel Grid.Row="2">
      <TextBlock Text="YOUR COLLECTION" Style="{StaticResource WideEyebrow}" Margin="15,0,0,12" />
@@ -197,7 +204,7 @@
     <StackPanel Grid.Row="4" Style="{StaticResource WideOnly}">
      <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,18" />
      <TextBlock Text="A small wish. A new look." FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
-     <TextBlock Text="Independent fan project · v1.0" FontSize="10" Foreground="#9F91B5" Margin="0,8,0,0" />
+     <TextBlock Text="{Binding AppVersionText}" FontSize="10" Foreground="#9F91B5" Margin="0,8,0,0" />
     </StackPanel>
    </Grid>
   </Border>
@@ -218,7 +225,7 @@
       <TextBlock Text="{Binding Page}" FontSize="20" FontWeight="SemiBold" />
       <TextBlock Text="{Binding LibraryVersion}" Style="{StaticResource TallMuted}" FontSize="11" Margin="0,5,0,0" TextTrimming="CharacterEllipsis" />
      </StackPanel>
-     <Button Grid.Column="1" Content="{Binding UpdateLabel}" Command="{Binding UpdateCommand}" Padding="20,10" VerticalAlignment="Center" Style="{StaticResource Primary}" ToolTip="Checks the default branch and reinstalls the complete package library when its commit changes." AutomationProperties.AutomationId="UpdateLibrary" />
+     <Button Grid.Column="1" Content="{Binding UpdateLabel}" Command="{Binding UpdateCommand}" Padding="20,10" VerticalAlignment="Center" Style="{StaticResource Primary}" ToolTip="Checks for a new MadokaChanger and LTK Manager, installs LTK Manager if it's missing, then refreshes the skin library." AutomationProperties.AutomationId="UpdateLibrary" />
     </Grid>
    </Border>
    <Border Grid.Row="1" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Padding="16,8" Background="#211A2D">
@@ -511,6 +518,7 @@
        </StackPanel>
        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
         <Button Content="Apply Selection" Style="{StaticResource Primary}" Command="{Binding ApplySelectionCommand}" AutomationProperties.AutomationId="ApplySelection" />
+        <Button Content="Set Profile Background" ToolTip="Sets your League profile background to this skin's splash art. The League client must be open and logged in." Command="{Binding SetProfileBackgroundCommand}" Margin="8,0,0,0" AutomationProperties.AutomationId="SetProfileBackground" />
         <Button Content="Reset" ToolTip="Reset to default appearance" Command="{Binding ResetCommand}" Style="{StaticResource Quiet}" Margin="8,0,0,0" AutomationProperties.AutomationId="ResetSelection" />
        </StackPanel>
       </Grid>
@@ -634,7 +642,7 @@
          <TextBox Text="{Binding LibraryFolder,UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Skin library location" />
         </DockPanel>
         <TextBlock Text="Changing this path selects a different library. Existing files stay in place." Style="{StaticResource Muted}" FontSize="11" Margin="0,8,0,0" />
-        <TextBlock Text="The skin backend is included and configured automatically." Style="{StaticResource Muted}" FontSize="12" Margin="0,18,0,0" />
+        <TextBlock Text="The skin backend is included. LTK Manager provides the signed patcher League accepts, and Update installs or updates it for you." Style="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,18,0,0" />
        </StackPanel>
       </Border>
       <Border Style="{StaticResource ResponsiveCard}" Margin="0,0,0,18">
