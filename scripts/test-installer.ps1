@@ -20,7 +20,8 @@ $desktopHash=if(Test-Path -LiteralPath $desktopLink){(Get-FileHash -LiteralPath 
 function Run-Hidden([string]$executable,[string[]]$arguments){
     $start=[Diagnostics.ProcessStartInfo]::new($executable)
     $start.UseShellExecute=$false;$start.CreateNoWindow=$true
-    foreach($argument in $arguments){$start.ArgumentList.Add($argument)}
+    # Quoted Arguments string instead of ArgumentList so this also runs on Windows PowerShell 5.1.
+    $start.Arguments=($arguments | ForEach-Object { if($_ -match '\s'){'"'+$_+'"'}else{$_} }) -join ' '
     $process=[Diagnostics.Process]::Start($start);$process.WaitForExit()
     if($process.ExitCode -ne 0){throw "Installer verification process exited $($process.ExitCode). Logs: $runRoot"}
 }
@@ -28,7 +29,7 @@ $installArguments=@('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/NOIC
 Run-Hidden $Installer ($installArguments+('/LOG='+(Join-Path $runRoot 'install.log')))
 $payload=@(Get-ChildItem -LiteralPath $PublishDirectory -Recurse -File | Where-Object Extension -ne '.pdb')
 foreach($file in $payload){
-    $relative=[IO.Path]::GetRelativePath($PublishDirectory,$file.FullName)
+    $relative=$file.FullName.Substring($PublishDirectory.Length).TrimStart('\')
     $installed=Join-Path $target $relative
     if(!(Test-Path -LiteralPath $installed)){throw "Installer omitted $relative"}
     if((Get-FileHash -LiteralPath $installed -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash){throw "Installed payload differs: $relative"}

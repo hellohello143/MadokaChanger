@@ -32,7 +32,7 @@
 ## Install
 
 1. Open the [latest release](https://github.com/hellohello143/MadokaChanger/releases/latest).
-2. Download **MadokaChanger-Setup-1.0.0.exe** and run it.
+2. Download **MadokaChanger-Setup-1.0.1.exe** and run it.
 3. Choose the installation folder and whether to create a desktop shortcut.
 4. Launch **MadokaChanger** from the desktop or Start menu.
 
@@ -51,7 +51,7 @@ Preview-only variants cannot be applied. Selections saved during a session take 
 
 ## Build from source
 
-You need the **.NET 10 SDK**, **Rust** with a Windows C/C++ toolchain, and **Inno Setup 6.7.3 or later** to build the installer.
+You need the **.NET 10 SDK**, **Rust** with a Windows C/C++ toolchain, and **Inno Setup 6.7.3 or later** (7.x works) to build the installer.
 
 ```powershell
 git clone https://github.com/hellohello143/MadokaChanger.git
@@ -59,7 +59,7 @@ cd MadokaChanger
 
 ./scripts/build-native.ps1
 ./scripts/publish.ps1
-./scripts/build-installer.ps1 -Version 1.0.0
+./scripts/build-installer.ps1 -Version 1.0.1
 ```
 
 The published app appears in `artifacts/win-x64/`; the installer and checksums appear in `artifacts/installer/`. If Inno Setup is outside its default location, pass `-CompilerPath "C:\path\to\ISCC.exe"`.
