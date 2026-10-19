@@ -1,0 +1,11 @@
+{
+  "repository": "Alban1911/LeagueSkins",
+  "commit": "40573673466dd3fc250a9c2a8b945514ca119fe6",
+  "metadataPatch": "16.20",
+  "champions": 173,
+  "classicChampionsExcluded": 77,
+  "packages": 9063,
+  "classicPackagesExcluded": 1734,
+  "mapped": 9047,
+  "unavailable": 16
+}

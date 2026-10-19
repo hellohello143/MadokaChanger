@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\MadokaChanger.ico</ApplicationIcon>
+    <AssemblyName>MadokaChanger</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets\MadokaChibi.png"/>
+    <Resource Include="Assets\MadokaChanger.ico"/>
+    <ProjectReference Include="../MadokaChanger.Core/MadokaChanger.Core.csproj"/>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0"/>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0"/>
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0"/>
+    <Content Include="../../native/bin/madokachanger-ltk.exe" Condition="Exists('../../native/bin/madokachanger-ltk.exe')" Link="backend/madokachanger-ltk.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"/>
+    <Content Include="../../backend/*" Link="backend/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"/>
+  </ItemGroup>
+  <Target Name="EnsureBundledBackend" BeforeTargets="PrepareForPublish">
+    <Error Condition="!Exists('../../backend/ltk_patcher_host.exe') Or !Exists('../../backend/ltk_patcher_dll.dll') Or !Exists('../../native/bin/madokachanger-ltk.exe')" Text="Bundled backend is incomplete. Run scripts/publish.ps1 to prepare the complete distribution."/>
+  </Target>
+</Project>

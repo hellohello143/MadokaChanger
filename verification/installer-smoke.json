@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "payloadFilesVerified": 854,
+  "upgradeVerified": true,
+  "uninstallVerified": true,
+  "untrackedDataPreserved": true,
+  "desktopShortcutUnchanged": true,
+  "appLaunched": false,
+  "installerSha256": "7df3917a705d0b3bafb8e24158ab00da670ea75f4c6e2a70b74a6f0ded94cb23"
+}

@@ -1,0 +1,16 @@
+[package]
+name = "madokachanger-ltk"
+version = "1.0.0"
+edition = "2024"
+license = "Apache-2.0"
+
+[dependencies]
+ltk_mod_project = { git = "https://github.com/LeagueToolkit/league-mod", rev = "acaf19e5e1e32ff11376f0af1bccfbaecc28026d", features = ["fantome", "modpkg"] }
+ltk_modpkg = { git = "https://github.com/LeagueToolkit/league-mod", rev = "acaf19e5e1e32ff11376f0af1bccfbaecc28026d" }
+ltk_overlay = { git = "https://github.com/LeagueToolkit/league-mod", rev = "acaf19e5e1e32ff11376f0af1bccfbaecc28026d" }
+camino = "1.1"
+serde_json = "1"
+
+[profile.release]
+strip = true
+lto = "thin"

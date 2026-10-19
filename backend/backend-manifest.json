@@ -1,0 +1,20 @@
+{
+  "revision": "1a3d4f900054a739f833b6a028e87caa58455fbb",
+  "license": "../licenses/LTK-PATCHER-LICENSE.md",
+  "upstreamSignaturesRemoved": true,
+  "executableSectionsUnchanged": true,
+  "files": [
+    {
+      "name": "ltk_patcher_host.exe",
+      "source": "https://raw.githubusercontent.com/LeagueToolkit/ltk-manager/1a3d4f900054a739f833b6a028e87caa58455fbb/src-tauri/resources/ltk_patcher_host.exe",
+      "upstreamSha256": "23fa1aaeda1a0c743da44227f179084e1fb81c7cd262144a3c8604ffc49d3bc1",
+      "bundledSha256": "5e52dc5a30220e735599be57308ce7bf52e21416cf2c2d9d449a8637f683c4e9"
+    },
+    {
+      "name": "ltk_patcher_dll.dll",
+      "source": "https://raw.githubusercontent.com/LeagueToolkit/ltk-manager/1a3d4f900054a739f833b6a028e87caa58455fbb/src-tauri/resources/ltk_patcher_dll.dll",
+      "upstreamSha256": "6d419057e6667994ba752ad0fb089b363db98267618644d7f7b6632441a21d74",
+      "bundledSha256": "b164a14a2d6c1f1ea6d546782c556050f6f9045dfab686e4967e7d7cd2e87e29"
+    }
+  ]
+}

@@ -1,0 +1,729 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:ui="clr-namespace:MadokaChanger.App.Controls" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="MadokaChanger.App.MainWindow" Title="MadokaChanger" Icon="Assets/MadokaChanger.ico" Width="1180" Height="820" MinWidth="720" MinHeight="500" WindowStartupLocation="CenterScreen" UseLayoutRounding="True" Closing="WindowClosing" Loaded="WindowLoaded" AllowDrop="True" Drop="WindowDrop" DragOver="WindowDragOver">
+ <Window.Resources><Style x:Key="PreviewArrow" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="VerticalAlignment" Value="Center"/><Setter Property="Margin" Value="14,0"/><Style.Triggers><DataTrigger Binding="{Binding ShortLayout}" Value="True"><Setter Property="VerticalAlignment" Value="Top"/><Setter Property="Margin" Value="12,8,12,0"/></DataTrigger></Style.Triggers></Style>
+  <DataTemplate x:Key="NamedOption">
+   <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+  </DataTemplate>
+  <Style x:Key="WideOnly" TargetType="FrameworkElement">
+   <Style.Triggers>
+    <DataTrigger Binding="{Binding CompactLayout}" Value="True">
+     <Setter Property="Visibility" Value="Collapsed" />
+    </DataTrigger>
+   </Style.Triggers>
+  </Style>
+  <Style x:Key="TallOnly" TargetType="FrameworkElement">
+   <Style.Triggers>
+    <DataTrigger Binding="{Binding ShortLayout}" Value="True">
+     <Setter Property="Visibility" Value="Collapsed" />
+    </DataTrigger>
+   </Style.Triggers>
+  </Style>
+  <Style x:Key="WideEyebrow" TargetType="TextBlock" BasedOn="{StaticResource Eyebrow}">
+   <Style.Triggers>
+    <DataTrigger Binding="{Binding CompactLayout}" Value="True">
+     <Setter Property="Visibility" Value="Collapsed" />
+    </DataTrigger>
+   </Style.Triggers>
+  </Style>
+  <Style x:Key="ResponsiveHeading" TargetType="TextBlock" BasedOn="{StaticResource Heading}">
+   <Style.Triggers>
+    <DataTrigger Binding="{Binding CompactLayout}" Value="True">
+     <Setter Property="FontSize" Value="24" />
+    </DataTrigger>
+   </Style.Triggers>
+  </Style>
+  <Style x:Key="ResponsiveCard" TargetType="Border" BasedOn="{StaticResource Card}">
+   <Style.Triggers>
+    <DataTrigger Binding="{Binding NarrowLayout}" Value="True">
+     <Setter Property="Padding" Value="16" />
+    </DataTrigger>
+   </Style.Triggers>
+  </Style>
+  <Style x:Key="VariantCard" TargetType="Border" BasedOn="{StaticResource ResponsiveCard}">
+   <Style.Triggers>
+    <MultiDataTrigger>
+     <MultiDataTrigger.Conditions>
+      <Condition Binding="{Binding HasChromas}" Value="False" />
+      <Condition Binding="{Binding HasForms}" Value="False" />
+     </MultiDataTrigger.Conditions>
+     <Setter Property="Visibility" Value="Collapsed" />
+    </MultiDataTrigger>
+   </Style.Triggers>
+  </Style>
+  <Style x:Key="BrandHeader" TargetType="StackPanel">
+   <Setter Property="HorizontalAlignment" Value="Left" />
+   <Style.Triggers>
+    <DataTrigger Binding="{Binding CompactLayout}" Value="True">
+     <Setter Property="HorizontalAlignment" Value="Center" />
+    </DataTrigger>
+   </Style.Triggers>
+  </Style>
+  <Style x:Key="PreviewTitle" TargetType="TextBlock">
+   <Setter Property="FontSize" Value="32" />
+   <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+   <Style.Triggers>
+    <DataTrigger Binding="{Binding ShortLayout}" Value="True">
+     <Setter Property="FontSize" Value="20" />
+    </DataTrigger>
+   </Style.Triggers>
+  </Style>
+  <Style x:Key="ChromaThumbnail" TargetType="ui:AsyncImage">
+   <Setter Property="Width" Value="144" />
+   <Setter Property="Height" Value="144" />
+   <Style.Triggers>
+    <DataTrigger Binding="{Binding NarrowLayout}" Value="True">
+     <Setter Property="Width" Value="96" />
+     <Setter Property="Height" Value="96" />
+    </DataTrigger>
+    <DataTrigger Binding="{Binding ShortLayout}" Value="True">
+     <Setter Property="Width" Value="72" />
+     <Setter Property="Height" Value="72" />
+    </DataTrigger>
+   </Style.Triggers>
+  </Style>
+  <Style x:Key="SecondaryColumn" TargetType="ColumnDefinition">
+   <Setter Property="Width" Value="*" />
+   <Style.Triggers>
+    <DataTrigger Binding="{Binding NarrowLayout}" Value="True">
+     <Setter Property="Width" Value="0" />
+    </DataTrigger>
+   </Style.Triggers>
+  </Style>
+  <Style x:Key="TallMuted" TargetType="TextBlock" BasedOn="{StaticResource Muted}">
+   <Style.Triggers>
+    <DataTrigger Binding="{Binding ShortLayout}" Value="True">
+     <Setter Property="Visibility" Value="Collapsed" />
+    </DataTrigger>
+   </Style.Triggers>
+  </Style>
+  <Style x:Key="PreviewArtwork" TargetType="ui:AsyncImage">
+   <Setter Property="ImageStretch" Value="Uniform" />
+   <Style.Triggers>
+    <DataTrigger Binding="{Binding ShortLayout}" Value="True">
+     <Setter Property="ImageStretch" Value="UniformToFill" />
+    </DataTrigger>
+   </Style.Triggers>
+  </Style>
+  <Style x:Key="CompactHeader" TargetType="Border">
+   <Setter Property="Padding" Value="20,12" />
+   <Style.Triggers>
+    <DataTrigger Binding="{Binding ShortLayout}" Value="True">
+     <Setter Property="Padding" Value="16,5" />
+    </DataTrigger>
+   </Style.Triggers>
+  </Style>
+ </Window.Resources>
+ <Window.InputBindings>
+  <KeyBinding Key="Escape" Command="{Binding BackCommand}" />
+ </Window.InputBindings>
+ <Grid Background="{StaticResource BackgroundBrush}" TextElement.Foreground="{StaticResource TextBrush}" TextElement.FontFamily="Segoe UI" TextElement.FontSize="14" x:Name="ApplicationLayout" SizeChanged="ViewportSizeChanged">
+  <Grid.ColumnDefinitions>
+   <ColumnDefinition Width="{Binding SidebarWidth}" />
+   <ColumnDefinition Width="*" />
+  </Grid.ColumnDefinitions>
+  <Border Background="#15111F" BorderBrush="#2B2439" BorderThickness="0,0,1,0">
+   <Grid Margin="{Binding SidebarMargin}">
+    <Grid.RowDefinitions>
+     <RowDefinition Height="Auto" />
+     <RowDefinition Height="50" />
+     <RowDefinition Height="Auto" />
+     <RowDefinition Height="*" />
+     <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <StackPanel>
+     <StackPanel Orientation="Horizontal" Margin="0,0,0,10" Style="{StaticResource BrandHeader}">
+      <Image x:Name="BrandMascot" Source="Assets/MadokaChibi.png" Width="36" Height="40" Margin="0" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="Madoka chibi" />
+      <TextBlock Text="MadokaChanger" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,0,0" Style="{StaticResource WideOnly}" />
+     </StackPanel>
+     <TextBlock Text="MADOKA SKIN ATELIER" FontSize="9" Foreground="{StaticResource MutedBrush}" Margin="3,0,0,0" Style="{StaticResource WideOnly}" />
+    </StackPanel>
+    <StackPanel Grid.Row="2">
+     <TextBlock Text="YOUR COLLECTION" Style="{StaticResource WideEyebrow}" Margin="15,0,0,12" />
+     <Button Content="{Binding SkinsNavigation}" Command="{Binding NavigateCommand}" CommandParameter="Skins" AutomationProperties.AutomationId="NavSkins" ToolTip="Skins">
+      <Button.Style>
+       <Style TargetType="Button" BasedOn="{StaticResource NavButton}">
+        <Style.Triggers>
+         <DataTrigger Binding="{Binding IsSkins}" Value="True">
+          <Setter Property="Background" Value="#302238" />
+          <Setter Property="Foreground" Value="{StaticResource PinkBrush}" />
+         </DataTrigger>
+         <DataTrigger Binding="{Binding CompactLayout}" Value="True">
+          <Setter Property="Padding" Value="8,14" />
+          <Setter Property="HorizontalContentAlignment" Value="Center" />
+          <Setter Property="FontSize" Value="20" />
+         </DataTrigger>
+        </Style.Triggers>
+       </Style>
+      </Button.Style>
+     </Button>
+     <Button Content="{Binding CustomNavigation}" Command="{Binding NavigateCommand}" CommandParameter="Custom Skins" AutomationProperties.AutomationId="NavCustom" ToolTip="Custom skins">
+      <Button.Style>
+       <Style TargetType="Button" BasedOn="{StaticResource NavButton}">
+        <Style.Triggers>
+         <DataTrigger Binding="{Binding IsCustom}" Value="True">
+          <Setter Property="Background" Value="#302238" />
+          <Setter Property="Foreground" Value="{StaticResource PinkBrush}" />
+         </DataTrigger>
+         <DataTrigger Binding="{Binding CompactLayout}" Value="True">
+          <Setter Property="Padding" Value="8,14" />
+          <Setter Property="HorizontalContentAlignment" Value="Center" />
+          <Setter Property="FontSize" Value="20" />
+         </DataTrigger>
+        </Style.Triggers>
+       </Style>
+      </Button.Style>
+     </Button>
+     <Button Content="{Binding SettingsNavigation}" Command="{Binding NavigateCommand}" CommandParameter="Settings" AutomationProperties.AutomationId="NavSettings" ToolTip="Settings">
+      <Button.Style>
+       <Style TargetType="Button" BasedOn="{StaticResource NavButton}">
+        <Style.Triggers>
+         <DataTrigger Binding="{Binding IsSettings}" Value="True">
+          <Setter Property="Background" Value="#302238" />
+          <Setter Property="Foreground" Value="{StaticResource PinkBrush}" />
+         </DataTrigger>
+         <DataTrigger Binding="{Binding CompactLayout}" Value="True">
+          <Setter Property="Padding" Value="8,14" />
+          <Setter Property="HorizontalContentAlignment" Value="Center" />
+          <Setter Property="FontSize" Value="20" />
+         </DataTrigger>
+        </Style.Triggers>
+       </Style>
+      </Button.Style>
+     </Button>
+    </StackPanel>
+    <Grid Grid.Row="3" IsHitTestVisible="False" VerticalAlignment="Bottom" Height="200" Opacity=".55" Style="{StaticResource WideOnly}">
+     <Ellipse Fill="{StaticResource MagicCircle}" Width="235" Height="235" HorizontalAlignment="Center" />
+     <TextBlock Text="✧" Foreground="#79638D" FontSize="28" HorizontalAlignment="Center" VerticalAlignment="Center" />
+    </Grid>
+    <StackPanel Grid.Row="4" Style="{StaticResource WideOnly}">
+     <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,18" />
+     <TextBlock Text="A small wish. A new look." FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
+     <TextBlock Text="Independent fan project · v1.0" FontSize="10" Foreground="#9F91B5" Margin="0,8,0,0" />
+    </StackPanel>
+   </Grid>
+  </Border>
+  <Grid Grid.Column="1">
+   <Grid.RowDefinitions>
+    <RowDefinition Height="Auto" />
+    <RowDefinition Height="Auto" />
+    <RowDefinition Height="*" />
+    <RowDefinition Height="Auto" />
+   </Grid.RowDefinitions>
+   <Border BorderBrush="#2B2439" BorderThickness="0,0,0,1" Style="{StaticResource CompactHeader}">
+    <Grid>
+     <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="Auto" />
+     </Grid.ColumnDefinitions>
+     <StackPanel VerticalAlignment="Center">
+      <TextBlock Text="{Binding Page}" FontSize="20" FontWeight="SemiBold" />
+      <TextBlock Text="{Binding LibraryVersion}" Style="{StaticResource TallMuted}" FontSize="11" Margin="0,5,0,0" TextTrimming="CharacterEllipsis" />
+     </StackPanel>
+     <Button Grid.Column="1" Content="{Binding UpdateLabel}" Command="{Binding UpdateCommand}" Padding="20,10" VerticalAlignment="Center" Style="{StaticResource Primary}" ToolTip="Checks the default branch and reinstalls the complete package library when its commit changes." AutomationProperties.AutomationId="UpdateLibrary" />
+    </Grid>
+   </Border>
+   <Border Grid.Row="1" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Padding="16,8" Background="#211A2D">
+    <Grid>
+     <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="Auto" />
+     </Grid.ColumnDefinitions>
+     <TextBlock Text="{Binding Message}" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center">
+      <TextBlock.Style>
+       <Style TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+        <Style.Triggers>
+         <DataTrigger Binding="{Binding HasError}" Value="True">
+          <Setter Property="Foreground" Value="{StaticResource ErrorBrush}" />
+         </DataTrigger>
+        </Style.Triggers>
+       </Style>
+      </TextBlock.Style>
+     </TextBlock>
+     <Button Grid.Column="1" Content="Retry" Command="{Binding RetryCommand}" Visibility="{Binding HasError,Converter={StaticResource BoolVisibility}}" Margin="16,0,0,0" Padding="12,3" MinHeight="28" FontSize="12" />
+    </Grid>
+    <Border.Style>
+     <Style TargetType="Border">
+      <Style.Triggers>
+       <MultiDataTrigger>
+        <MultiDataTrigger.Conditions>
+         <Condition Binding="{Binding IsDetail}" Value="True" />
+         <Condition Binding="{Binding ShortLayout}" Value="True" />
+         <Condition Binding="{Binding HasError}" Value="False" />
+        </MultiDataTrigger.Conditions>
+        <Setter Property="Visibility" Value="Collapsed" />
+       </MultiDataTrigger>
+      </Style.Triggers>
+     </Style>
+    </Border.Style>
+   </Border>
+   <Grid Grid.Row="2" x:Name="ContentArea" SizeChanged="ContentSizeChanged">
+    <Grid Margin="{Binding PageMargin}" Visibility="{Binding IsBrowser,Converter={StaticResource BoolVisibility}}">
+     <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+     </Grid.RowDefinitions>
+     <Grid>
+      <Grid.ColumnDefinitions>
+       <ColumnDefinition Width="*" />
+       <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <Grid.RowDefinitions>
+       <RowDefinition Height="Auto" />
+       <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <StackPanel>
+       <TextBlock Text="Choose your champion" Style="{StaticResource ResponsiveHeading}" />
+       <TextBlock Text="Find a familiar face. Make a little magic." Margin="0,8,0,0">
+        <TextBlock.Style>
+         <Style TargetType="TextBlock" BasedOn="{StaticResource Muted}">
+          <Style.Triggers>
+           <DataTrigger Binding="{Binding ShortLayout}" Value="True">
+            <Setter Property="Visibility" Value="Collapsed" />
+           </DataTrigger>
+          </Style.Triggers>
+         </Style>
+        </TextBlock.Style>
+       </TextBlock>
+      </StackPanel>
+      <TextBlock Text="{Binding ChampionCount}" VerticalAlignment="Bottom">
+       <TextBlock.Style>
+        <Style TargetType="TextBlock" BasedOn="{StaticResource Eyebrow}">
+         <Setter Property="Grid.Column" Value="1" />
+         <Setter Property="Margin" Value="12,0,0,4" />
+         <Style.Triggers>
+          <DataTrigger Binding="{Binding NarrowLayout}" Value="True">
+           <Setter Property="Grid.Column" Value="0" />
+           <Setter Property="Grid.Row" Value="1" />
+           <Setter Property="Margin" Value="0,6,0,0" />
+          </DataTrigger>
+         </Style.Triggers>
+        </Style>
+       </TextBlock.Style>
+      </TextBlock>
+     </Grid>
+     <Grid Grid.Row="1" Margin="0,16,0,14">
+      <Grid.ColumnDefinitions>
+       <ColumnDefinition Width="*" />
+       <ColumnDefinition Width="Auto" />
+       <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <TextBox x:Name="ChampionSearch" Text="{Binding Search,UpdateSourceTrigger=PropertyChanged}" ToolTip="Search champions by name" AutomationProperties.Name="Search champions" AutomationProperties.AutomationId="ChampionSearch" />
+      <TextBlock Text="⌕  Search champions" Margin="14,11" IsHitTestVisible="False" Foreground="{StaticResource MutedBrush}">
+       <TextBlock.Style>
+        <Style TargetType="TextBlock">
+         <Setter Property="Visibility" Value="Collapsed" />
+         <Style.Triggers>
+          <DataTrigger Binding="{Binding Search}" Value="">
+           <Setter Property="Visibility" Value="Visible" />
+          </DataTrigger>
+         </Style.Triggers>
+        </Style>
+       </TextBlock.Style>
+      </TextBlock>
+      <CheckBox Grid.Column="1" Content="Favorites" IsChecked="{Binding FavoritesOnly}" Margin="20,0,0,0" VerticalAlignment="Center" />
+      <CheckBox Grid.Column="2" Content="Saved" IsChecked="{Binding SavedOnly}" Margin="20,0,0,0" VerticalAlignment="Center" />
+     </Grid>
+     <ListBox x:Name="ChampionGrid" Grid.Row="2" ItemsSource="{Binding ChampionRows}" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.ScrollUnit="Pixel" AutomationProperties.AutomationId="ChampionGrid">
+      <ListBox.ItemContainerStyle>
+       <Style TargetType="ListBoxItem">
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Template">
+         <Setter.Value>
+          <ControlTemplate TargetType="ListBoxItem">
+           <ContentPresenter />
+          </ControlTemplate>
+         </Setter.Value>
+        </Setter>
+       </Style>
+      </ListBox.ItemContainerStyle>
+      <ListBox.ItemTemplate>
+       <DataTemplate>
+        <ItemsControl ItemsSource="{Binding Champions}">
+         <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+           <WrapPanel />
+          </ItemsPanelTemplate>
+         </ItemsControl.ItemsPanel>
+         <ItemsControl.ItemTemplate>
+          <DataTemplate>
+           <Grid Width="{Binding Owner.ChampionCardWidth}" Margin="0,0,8,12">
+            <Button Command="{Binding Owner.OpenChampionCommand}" CommandParameter="{Binding}" Padding="0" HorizontalContentAlignment="Stretch" ToolTip="{Binding Name}" AutomationProperties.Name="{Binding Name}">
+             <StackPanel>
+              <Grid Height="{Binding Owner.ChampionPortraitHeight}">
+               <Border CornerRadius="9,9,0,0" ClipToBounds="True">
+                <ui:AsyncImage Url="{Binding Portrait}" />
+               </Border>
+               <Border Background="#D1100E18" HorizontalAlignment="Left" VerticalAlignment="Bottom" CornerRadius="0,6,0,0" Padding="7,4" Visibility="{Binding HasSelection,Converter={StaticResource BoolVisibility}}">
+                <TextBlock Text="{Binding SelectionLabel}" FontSize="10" Foreground="{StaticResource GoldBrush}" />
+               </Border>
+              </Grid>
+              <TextBlock Text="{Binding Name}" Margin="12,12,30,13" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+             </StackPanel>
+            </Button>
+            <Button Content="{Binding FavoriteLabel}" Command="{Binding Owner.FavoriteCommand}" CommandParameter="{Binding}" Style="{StaticResource Quiet}" Foreground="{StaticResource GoldBrush}" FontSize="18" Padding="6,2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,3,7" MinHeight="28" ToolTip="Toggle favorite" AutomationProperties.Name="Toggle favorite" />
+           </Grid>
+          </DataTemplate>
+         </ItemsControl.ItemTemplate>
+        </ItemsControl>
+       </DataTemplate>
+      </ListBox.ItemTemplate>
+     </ListBox>
+     <StackPanel Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="{Binding IsEmpty,Converter={StaticResource BoolVisibility}}">
+      <TextBlock Text="◇" FontSize="46" Foreground="{StaticResource PinkBrush}" HorizontalAlignment="Center" />
+      <TextBlock Text="The collection is waiting" FontSize="20" Margin="0,16,0,8" />
+      <TextBlock Text="Connect to load champion metadata, then retry." Style="{StaticResource Muted}" />
+      <Button Content="Load champion metadata" Command="{Binding RefreshMetadataCommand}" Margin="0,20,0,0" />
+     </StackPanel>
+     <TextBlock Grid.Row="2" Text="No champions match these filters." Style="{StaticResource Muted}" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="{Binding IsSearchEmpty,Converter={StaticResource BoolVisibility}}" />
+    </Grid>
+    <Grid Visibility="{Binding IsDetail,Converter={StaticResource BoolVisibility}}" Margin="{Binding PageMargin}">
+     <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+     </Grid.RowDefinitions>
+     <Grid Margin="0,0,0,6">
+      <Grid.ColumnDefinitions>
+       <ColumnDefinition Width="Auto" />
+       <ColumnDefinition Width="*" />
+       <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <Button Content="←  Champions" Command="{Binding BackCommand}" Style="{StaticResource Quiet}" Padding="0,4,18,4" MinHeight="28" />
+      <TextBlock Grid.Column="2" Text="SKIN SELECTION" Style="{StaticResource Eyebrow}" VerticalAlignment="Center" />
+     </Grid>
+     <Border CornerRadius="16" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" ClipToBounds="True" Grid.Row="1">
+      <Grid x:Name="SkinPreview" AutomationProperties.AutomationId="SkinPreview" MinHeight="80">
+       <Rectangle Fill="{StaticResource MagicCircle}" />
+       <ui:AsyncImage Url="{Binding Splash}" Style="{StaticResource PreviewArtwork}" />
+       <Rectangle IsHitTestVisible="False">
+        <Rectangle.Fill>
+         <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+          <GradientStop Color="#00000000" Offset=".35" />
+          <GradientStop Color="#EE100E18" Offset="1" />
+         </LinearGradientBrush>
+        </Rectangle.Fill>
+       </Rectangle>
+       <StackPanel VerticalAlignment="Bottom" Margin="20,0,20,12">
+        <TextBlock Text="{Binding ChampionName}" FontSize="12" Foreground="{StaticResource PinkBrush}" FontWeight="SemiBold" Style="{StaticResource TallOnly}" />
+        <TextBlock Text="{Binding SkinName}" FontWeight="SemiBold" Margin="0,7,0,0" Style="{StaticResource PreviewTitle}" />
+        <TextBlock Text="{Binding VariantName}" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,7,0,0" />
+       </StackPanel>
+       <Button Content="‹" Command="{Binding PreviousSkinCommand}" FontSize="26" Padding="14,1" HorizontalAlignment="Left" Style="{StaticResource PreviewArrow}" ToolTip="Previous skin" />
+       <Button Content="›" Command="{Binding NextSkinCommand}" FontSize="26" Padding="14,1" HorizontalAlignment="Right" Style="{StaticResource PreviewArrow}" ToolTip="Next skin" />
+       <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="12" Padding="5" CornerRadius="8" Background="#D0181321" Visibility="{Binding HasChromaPreview,Converter={StaticResource BoolVisibility}}" IsHitTestVisible="False">
+        <ui:AsyncImage Url="{Binding ChromaPreview}" ImageStretch="Uniform" Style="{StaticResource ChromaThumbnail}" />
+       </Border>
+      </Grid>
+     </Border>
+     <ListBox x:Name="SkinCarousel" ItemsSource="{Binding Skins}" SelectedItem="{Binding SelectedSkin}" Margin="0,8,0,0" Height="{Binding SkinCarouselHeight}" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Disabled" SelectionChanged="SkinSelectionChanged" AutomationProperties.AutomationId="SkinCarousel" Grid.Row="2">
+      <ListBox.ItemContainerStyle>
+       <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+        <Setter Property="Padding" Value="3" />
+        <Setter Property="Margin" Value="0" />
+       </Style>
+      </ListBox.ItemContainerStyle>
+      <ListBox.ItemsPanel>
+       <ItemsPanelTemplate>
+        <VirtualizingStackPanel Orientation="Horizontal" />
+       </ItemsPanelTemplate>
+      </ListBox.ItemsPanel>
+      <ListBox.ItemTemplate>
+       <DataTemplate>
+        <StackPanel Width="{Binding DataContext.SkinThumbnailWidth,RelativeSource={RelativeSource AncestorType=ListBox}}">
+         <Border CornerRadius="6" ClipToBounds="True">
+          <ui:AsyncImage Url="{Binding Thumbnail}" Height="{Binding DataContext.SkinThumbnailHeight,RelativeSource={RelativeSource AncestorType=ListBox}}" />
+         </Border>
+         <TextBlock Text="{Binding Name}" FontSize="11" Margin="2,4,2,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" />
+        </StackPanel>
+       </DataTemplate>
+      </ListBox.ItemTemplate>
+     </ListBox>
+     <Border Grid.Row="3" Style="{StaticResource VariantCard}" Padding="10,5" Margin="0,6,0,0">
+      <Grid>
+       <Grid.ColumnDefinitions>
+        <ColumnDefinition>
+         <ColumnDefinition.Style>
+          <Style TargetType="ColumnDefinition">
+           <Setter Property="Width" Value="*" />
+           <Style.Triggers>
+            <DataTrigger Binding="{Binding HasChromas}" Value="False">
+             <Setter Property="Width" Value="0" />
+            </DataTrigger>
+           </Style.Triggers>
+          </Style>
+         </ColumnDefinition.Style>
+        </ColumnDefinition>
+        <ColumnDefinition>
+         <ColumnDefinition.Style>
+          <Style TargetType="ColumnDefinition">
+           <Setter Property="Width" Value="*" />
+           <Style.Triggers>
+            <DataTrigger Binding="{Binding HasForms}" Value="False">
+             <Setter Property="Width" Value="0" />
+            </DataTrigger>
+           </Style.Triggers>
+          </Style>
+         </ColumnDefinition.Style>
+        </ColumnDefinition>
+       </Grid.ColumnDefinitions>
+       <DockPanel Margin="0,0,8,0" Visibility="{Binding HasChromas,Converter={StaticResource BoolVisibility}}">
+        <TextBlock Text="Chroma" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0" />
+        <ListBox ItemsSource="{Binding Chromas}" SelectedItem="{Binding SelectedChroma}" Height="42" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Disabled" AutomationProperties.Name="Chroma color swatches" AutomationProperties.AutomationId="ChromaSelector">
+         <ListBox.ItemsPanel>
+          <ItemsPanelTemplate>
+           <VirtualizingStackPanel Orientation="Horizontal" />
+          </ItemsPanelTemplate>
+         </ListBox.ItemsPanel>
+         <ListBox.ItemContainerStyle>
+          <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+           <Setter Property="Padding" Value="3" />
+           <Setter Property="Margin" Value="0" />
+          </Style>
+         </ListBox.ItemContainerStyle>
+         <ListBox.ItemTemplate>
+          <DataTemplate>
+           <Border Width="22" Height="22" CornerRadius="11" Background="{Binding Colors,Converter={StaticResource SwatchBrush}}" ToolTip="{Binding Name}" AutomationProperties.Name="{Binding Name}" />
+          </DataTemplate>
+         </ListBox.ItemTemplate>
+        </ListBox>
+       </DockPanel>
+       <DockPanel Grid.Column="1" Visibility="{Binding HasForms,Converter={StaticResource BoolVisibility}}">
+        <TextBlock Text="Form" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0" />
+        <ComboBox ItemsSource="{Binding Forms}" SelectedItem="{Binding SelectedForm}" ItemTemplate="{StaticResource NamedOption}" AutomationProperties.Name="Special form" AutomationProperties.AutomationId="FormSelector" />
+       </DockPanel>
+      </Grid>
+     </Border>
+     <Border Grid.Row="4" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="0,8,0,0" Margin="0,8,0,0">
+      <Grid>
+       <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+       </Grid.ColumnDefinitions>
+       <StackPanel Margin="0,0,12,0">
+        <TextBlock Text="{Binding AvailabilityText}" Foreground="{StaticResource PinkBrush}" FontSize="11" TextTrimming="CharacterEllipsis" ToolTip="{Binding AvailabilityText}" />
+        <TextBlock Text="{Binding SavedText}" FontSize="11" TextTrimming="CharacterEllipsis" ToolTip="{Binding SavedText}" Margin="0,4,0,0" Style="{StaticResource TallOnly}" />
+        <TextBlock Text="{Binding ActiveText}" FontSize="10" TextTrimming="CharacterEllipsis" ToolTip="{Binding ActiveText}" Foreground="{StaticResource GoldBrush}" Margin="0,4,0,0" />
+       </StackPanel>
+       <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+        <Button Content="Apply Selection" Style="{StaticResource Primary}" Command="{Binding ApplySelectionCommand}" AutomationProperties.AutomationId="ApplySelection" />
+        <Button Content="Reset" ToolTip="Reset to default appearance" Command="{Binding ResetCommand}" Style="{StaticResource Quiet}" Margin="8,0,0,0" AutomationProperties.AutomationId="ResetSelection" />
+       </StackPanel>
+      </Grid>
+     </Border>
+    </Grid>
+    <Grid Visibility="{Binding IsCustom,Converter={StaticResource BoolVisibility}}" Margin="{Binding PageMargin}">
+     <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+     </Grid.RowDefinitions>
+     <StackPanel Margin="0,0,0,14">
+      <TextBlock Text="Custom Skins" Style="{StaticResource ResponsiveHeading}" />
+      <TextBlock Text="Your imports, kept separate from the skin library." Style="{StaticResource TallOnly}" Margin="0,8,0,0" />
+     </StackPanel>
+     <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions>
+       <ColumnDefinition Width="{Binding CustomChampionWidth}" />
+       <ColumnDefinition Width="12" />
+       <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <Border Style="{StaticResource Card}" Padding="12">
+       <Grid>
+        <Grid.RowDefinitions>
+         <RowDefinition Height="Auto" />
+         <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <TextBox Text="{Binding CustomSearch,UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Search custom skin champions" ToolTip="Search champion names" Margin="0,0,0,12" />
+        <ListBox Grid.Row="1" ItemsSource="{Binding CustomChampions}" SelectedItem="{Binding CustomChampion}" DisplayMemberPath="Name" />
+       </Grid>
+      </Border>
+      <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+       <StackPanel Margin="0,0,14,0">
+        <Grid Margin="0,0,0,14">
+         <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+         </Grid.ColumnDefinitions>
+         <StackPanel>
+          <TextBlock Text="{Binding CustomChampion.Name}" FontSize="20" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding CustomCount}" Style="{StaticResource Muted}" FontSize="11" Margin="0,5,0,0" />
+         </StackPanel>
+         <Button Grid.Column="1" Content="＋  Import" Click="ImportClick" IsEnabled="{Binding CanImport}" Style="{StaticResource Primary}" ToolTip="Import .modpkg, .fantome, or a recognized Fantome ZIP. You can also drop files here." AutomationProperties.AutomationId="ImportCustom" />
+        </Grid>
+        <DataGrid ItemsSource="{Binding CustomSkins}" SelectedItem="{Binding SelectedCustom}" EnableRowVirtualization="True" AutomationProperties.AutomationId="CustomTable" Height="{Binding CustomTableHeight}" MinHeight="160" ScrollViewer.HorizontalScrollBarVisibility="Auto">
+         <DataGrid.Columns>
+          <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" MinWidth="110" />
+          <DataGridTextColumn Header="Author" Binding="{Binding Author}" Width="80" />
+          <DataGridTextColumn Header="Version" Binding="{Binding Version}" Width="60" />
+          <DataGridTemplateColumn Header="Enabled" Width="65">
+           <DataGridTemplateColumn.CellTemplate>
+            <DataTemplate>
+             <TextBlock HorizontalAlignment="Center" FontSize="16">
+              <TextBlock.Style>
+               <Style TargetType="TextBlock">
+                <Setter Property="Text" Value="◇" />
+                <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+                <Style.Triggers>
+                 <DataTrigger Binding="{Binding Enabled}" Value="True">
+                  <Setter Property="Text" Value="◆" />
+                  <Setter Property="Foreground" Value="{StaticResource PinkBrush}" />
+                 </DataTrigger>
+                </Style.Triggers>
+               </Style>
+              </TextBlock.Style>
+             </TextBlock>
+            </DataTemplate>
+           </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="100" />
+         </DataGrid.Columns>
+        </DataGrid>
+        <WrapPanel Margin="0,12,0,12">
+         <Button Content="Enable / Disable" Command="{Binding ToggleCustomCommand}" IsEnabled="{Binding HasCustomSelection}" Margin="0,0,8,8" />
+         <Button Content="Uninstall" Command="{Binding UninstallCustomCommand}" Margin="0,0,8,8">
+          <Button.Style>
+           <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="IsEnabled" Value="False" />
+            <Style.Triggers>
+             <MultiDataTrigger>
+              <MultiDataTrigger.Conditions>
+               <Condition Binding="{Binding HasCustomSelection}" Value="True" />
+               <Condition Binding="{Binding CanImport}" Value="True" />
+              </MultiDataTrigger.Conditions>
+              <Setter Property="IsEnabled" Value="True" />
+             </MultiDataTrigger>
+            </Style.Triggers>
+           </Style>
+          </Button.Style>
+         </Button>
+         <Button Content="Open Folder" Command="{Binding OpenCustomFolderCommand}" IsEnabled="{Binding HasCustomSelection}" Margin="0,0,0,8" />
+        </WrapPanel>
+        <Border Style="{StaticResource ResponsiveCard}" Padding="16">
+         <StackPanel>
+          <TextBlock Text="{Binding ConflictSummary}" FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource GoldBrush}" Margin="0,0,0,10" />
+          <ComboBox ItemsSource="{Binding ConflictChoices}" SelectedItem="{Binding ConflictChoice}" ToolTip="Reject blocks all conflicts. PreferRepository or PreferCustom explicitly chooses which source wins overlapping file overrides." AutomationProperties.Name="Conflict resolution" />
+          <ScrollViewer MaxHeight="125" VerticalScrollBarVisibility="Auto" Margin="0,14,0,0">
+           <TextBlock Text="{Binding SelectedCustomDetails}" Style="{StaticResource Muted}" FontSize="11" />
+          </ScrollViewer>
+         </StackPanel>
+        </Border>
+       </StackPanel>
+      </ScrollViewer>
+     </Grid>
+    </Grid>
+    <ScrollViewer Visibility="{Binding IsSettings,Converter={StaticResource BoolVisibility}}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+     <StackPanel Margin="{Binding PageMargin}" MaxWidth="1000" HorizontalAlignment="Stretch">
+      <TextBlock Text="Settings" Style="{StaticResource ResponsiveHeading}" />
+      <TextBlock Text="Keep your collection and dependencies in order." Style="{StaticResource Muted}" Margin="0,8,0,24" />
+      <Border Style="{StaticResource ResponsiveCard}" Margin="0,0,0,18">
+       <StackPanel>
+        <TextBlock Text="Installation &amp; storage" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,20" />
+        <TextBlock Text="League Game folder" Style="{StaticResource Muted}" Margin="0,0,0,8" />
+        <DockPanel>
+         <Button DockPanel.Dock="Right" Content="Browse" Click="BrowseGame" Margin="10,0,0,0" />
+         <Button DockPanel.Dock="Right" Content="Detect" Command="{Binding DetectGameCommand}" Margin="10,0,0,0" />
+         <TextBox Text="{Binding GameFolder,UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="League Game folder" />
+        </DockPanel>
+        <TextBlock Text="Skin library location" Style="{StaticResource Muted}" Margin="0,18,0,8" />
+        <DockPanel>
+         <Button DockPanel.Dock="Right" Content="Browse" Click="BrowseLibrary" Margin="10,0,0,0" />
+         <TextBox Text="{Binding LibraryFolder,UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Skin library location" />
+        </DockPanel>
+        <TextBlock Text="Changing this path selects a different library. Existing files stay in place." Style="{StaticResource Muted}" FontSize="11" Margin="0,8,0,0" />
+        <TextBlock Text="The skin backend is included and configured automatically." Style="{StaticResource Muted}" FontSize="12" Margin="0,18,0,0" />
+       </StackPanel>
+      </Border>
+      <Border Style="{StaticResource ResponsiveCard}" Margin="0,0,0,18">
+       <Grid>
+        <Grid.ColumnDefinitions>
+         <ColumnDefinition Width="*" />
+         <ColumnDefinition Style="{StaticResource SecondaryColumn}" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+         <RowDefinition Height="Auto" />
+         <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <StackPanel Margin="0,0,25,0">
+         <TextBlock Text="Appearance &amp; language" FontSize="18" FontWeight="SemiBold" />
+         <TextBlock Text="Metadata language" Style="{StaticResource Muted}" Margin="0,18,0,8" />
+         <ComboBox ItemsSource="{Binding Languages}" SelectedItem="{Binding Language}" />
+         <CheckBox Content="Reduced motion" IsChecked="{Binding ReducedMotion}" Margin="0,18,0,0" />
+         <TextBlock Text="Disables artwork fades. Windows animation preferences are also respected." Style="{StaticResource Muted}" FontSize="11" Margin="0,10,0,0" />
+        </StackPanel>
+        <StackPanel>
+         <TextBlock Text="Cache &amp; diagnostics" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,16" />
+         <WrapPanel>
+          <Button Content="Refresh Metadata" Command="{Binding RefreshMetadataCommand}" Margin="0,0,8,8" />
+          <Button Content="Clear Image Cache" Command="{Binding ClearCacheCommand}" Margin="0,0,8,8" />
+          <Button Content="View Log" Command="{Binding ViewLogCommand}" Margin="0,0,8,8" />
+          <Button Content="Open Logs" Command="{Binding OpenLogsCommand}" Margin="0,0,8,8" />
+          <Button Content="Open App Data" Command="{Binding OpenDataCommand}" Margin="0,0,8,8" />
+         </WrapPanel>
+         <StackPanel.Style>
+          <Style TargetType="StackPanel">
+           <Setter Property="Grid.Column" Value="1" />
+           <Style.Triggers>
+            <DataTrigger Binding="{Binding NarrowLayout}" Value="True">
+             <Setter Property="Grid.Column" Value="0" />
+             <Setter Property="Grid.Row" Value="1" />
+             <Setter Property="Margin" Value="0,22,0,0" />
+            </DataTrigger>
+           </Style.Triggers>
+          </Style>
+         </StackPanel.Style>
+        </StackPanel>
+       </Grid>
+      </Border>
+      <Border Style="{StaticResource ResponsiveCard}">
+       <StackPanel>
+        <TextBlock Text="Backend &amp; dependency status" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock Text="{Binding DependencyStatus}" Style="{StaticResource Muted}" FontSize="12" LineHeight="22" Margin="0,14,0,0" />
+        <TextBlock Text="{Binding PatcherDetail}" TextWrapping="Wrap" Foreground="{StaticResource GoldBrush}" Margin="0,12,0,0" />
+        <Button Content="Save Settings" Command="{Binding SaveSettingsCommand}" Style="{StaticResource Primary}" HorizontalAlignment="Left" Margin="0,20,0,0" AutomationProperties.AutomationId="SaveSettings" />
+       </StackPanel>
+      </Border>
+     </StackPanel>
+    </ScrollViewer>
+   </Grid>
+   <Border Grid.Row="3" BorderBrush="#30273F" BorderThickness="0,1,0,0" Background="#17131F">
+    <StackPanel>
+     <ProgressBar Value="{Binding Progress}" Visibility="{Binding IsBusy,Converter={StaticResource BoolVisibility}}" />
+     <Grid Margin="16,8">
+      <Grid.ColumnDefinitions>
+       <ColumnDefinition Width="*" />
+       <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <StackPanel>
+       <StackPanel Orientation="Horizontal">
+        <TextBlock Text="◆" Foreground="{StaticResource PinkBrush}" FontSize="12" Margin="0,0,8,0" />
+        <TextBlock Text="{Binding PatcherLabel}" FontWeight="SemiBold" FontSize="12" />
+        <TextBlock Text="{Binding GameStatus}" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="20,1,0,0" TextTrimming="CharacterEllipsis" MaxWidth="180">
+         <TextBlock.Style>
+          <Style TargetType="TextBlock">
+           <Style.Triggers>
+            <DataTrigger Binding="{Binding NarrowLayout}" Value="True">
+             <Setter Property="Visibility" Value="Collapsed" />
+            </DataTrigger>
+           </Style.Triggers>
+          </Style>
+         </TextBlock.Style>
+        </TextBlock>
+       </StackPanel>
+       <TextBlock Text="{Binding Activity}" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,5,20,0" TextTrimming="CharacterEllipsis" Style="{StaticResource TallOnly}" />
+       <TextBlock Text="{Binding DisabledReason}" FontSize="10" Foreground="{StaticResource GoldBrush}" TextWrapping="Wrap" Visibility="{Binding HasDisabledReason,Converter={StaticResource BoolVisibility}}" Margin="0,5,20,0" />
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+       <Button Content="Cancel" Command="{Binding CancelCommand}" Visibility="{Binding IsBusy,Converter={StaticResource BoolVisibility}}" Style="{StaticResource Quiet}" Margin="0,0,10,0" />
+       <Button Content="■  Stop" Command="{Binding StopCommand}" Margin="0,0,10,0" AutomationProperties.AutomationId="StopPatcher" />
+       <Button Content="▷  Start" Command="{Binding StartCommand}" Style="{StaticResource Primary}" Padding="24,10" AutomationProperties.AutomationId="StartPatcher" />
+      </StackPanel>
+     </Grid>
+    </StackPanel>
+   </Border>
+  </Grid>
+ </Grid>
+</Window>

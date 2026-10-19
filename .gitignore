@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+native/target/
+.vs/
+artifacts/
+backend/*.exe
+backend/*.dll
+verification/*.log
+verification/screenshots/
+*.user
+.env
+.env.*
+!.env.example
