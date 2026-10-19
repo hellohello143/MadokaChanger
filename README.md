@@ -36,7 +36,7 @@
 3. Choose the installation folder and whether to create a desktop shortcut.
 4. Launch **MadokaChanger** from the desktop or Start menu.
 
-Requires **Windows 10/11 x64**. The installer includes .NET 10 and installs for the current user; installation does not require administrator access. The patcher may separately request elevation when you start a session. This release is unsigned; SHA-256 checksums are attached to the release.
+Requires **Windows 10/11 x64**. The installer includes .NET 10 and installs for the current user; installation does not require administrator access. Starting a session does not ask for administrator access either, unless League itself is set to run as administrator or you turn on **Run patcher as administrator** in Settings. If LTK Manager is installed, MadokaChanger uses its signed patcher automatically. This release is unsigned; SHA-256 checksums are attached to the release.
 
 The default installation is `%LOCALAPPDATA%\Programs\MadokaChanger`. Uninstall through Windows **Installed apps**. Settings, downloaded skins and imported content are kept separately and preserved when uninstalling.
 
@@ -70,9 +70,9 @@ See [building and development](docs/BUILDING.md) for toolchain details and isola
 
 ## Validation and compatibility
 
-The release passes **39 automated tests** and off-screen WPF checks across small and large window sizes, including 125% and 150% render scales. The installer payload is checked with an isolated install/uninstall smoke test.
+The release passes **59 automated tests** and off-screen WPF checks across small and large window sizes, including 125% and 150% render scales. The installer payload is checked with an isolated install/uninstall smoke test.
 
-**Live patcher attachment and in-game rendering have not been verified for this build.** Compatibility depends on the installed League patch and bundled backend. A running/scanning host is not proof that a skin rendered successfully in-game. Errors are surfaced in the app and its local logs.
+**Live patcher attachment and in-game rendering have not been verified for this build.** Compatibility depends on the installed League patch and bundled backend. A running/scanning host is not proof that a skin rendered successfully in-game; the status bar switches to **In game · skins applied** only once League actually loads a modded archive. Errors are surfaced in the app and its local logs.
 
 ## Project notes
 

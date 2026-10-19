@@ -8,6 +8,7 @@ if(first?.StartsWith('{')==true)
 }
 var folder=AppContext.BaseDirectory;
 await File.WriteAllTextAsync(Path.Combine(folder,"host.pid"),Environment.ProcessId.ToString());
+await File.WriteAllTextAsync(Path.Combine(folder,"args.log"),string.Join('\n',args));
 var mode=File.Exists(Path.Combine(folder,"test-mode.txt"))?File.ReadAllText(Path.Combine(folder,"test-mode.txt")):"normal";
 for(var line=first;line is not null;line=await Console.In.ReadLineAsync())
 {

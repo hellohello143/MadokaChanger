@@ -68,11 +68,36 @@ public sealed class CoreTests : IDisposable
     }
     [Fact] public void Host_protocol_uses_the_verified_config_and_scanning_commands()
     {
-        var lines=HostEvent.Configuration(@"C:\overlay");Assert.Equal("config loglevel 16",lines[0]);Assert.Equal("config flags 0",lines[1]);Assert.Equal("start scan",lines[3]);Assert.EndsWith(Path.DirectorySeparatorChar.ToString(),lines[2]);
+        var lines=HostEvent.Configuration(@"C:\overlay",HookFlags.For(new AppSettings()));Assert.Equal("config loglevel 16",lines[0]);Assert.Equal("config flags 4",lines[1]);Assert.Equal("start scan",lines[3]);Assert.EndsWith(Path.DirectorySeparatorChar.ToString(),lines[2]);
+        Assert.Equal("config flags 0",HostEvent.Configuration(@"C:\overlay",HookFlags.For(new AppSettings{EnforceSkinhackScan=true}))[1]);
         var e=HostEvent.Parse("status 0.001 injecting scanning for game");Assert.Equal("injecting",e?.State);Assert.Equal("scanning for game",e?.Message);
         Assert.Equal("unknown command",HostEvent.Parse("error 5.000 unknown command")?.Message);
-        Assert.Throws<ArgumentException>(()=>HostEvent.Configuration("bad\nstop"));
+        Assert.Throws<ArgumentException>(()=>HostEvent.Configuration("bad\nstop",0));
     }
+    [Fact] public void Dll_records_split_level_from_message()
+    {
+        var e=HostEvent.Parse("dll 64.6055036 11776 24292 ERROR ltk_patcher_dll::verify: WAD scan failed status with c0000229 for briar.wad.client");
+        Assert.Equal("dll",e?.Kind);Assert.Equal("ERROR",e?.Level);Assert.Equal("ltk_patcher_dll::verify: WAD scan failed status with c0000229 for briar.wad.client",e?.Message);
+    }
+    // Lines copied from a working ltk-manager 1.28.1 session with the anti-skinhack scan opted out.
+    [Theory]
+    [InlineData("WARN","ltk_patcher_dll::verify: AH wad scan failed c0000229 for ahri (opted out):skin0 is another skin: SkinAudioProperties.TagEventList names ahriSkin<n>",DllLineKind.Other)]
+    [InlineData("INFO","ltk_patcher_dll::verify: overlay verified 21 wad(s)",DllLineKind.Other)]
+    [InlineData("INFO","ltk_patcher_dll::entry: init done",DllLineKind.InitDone)]
+    [InlineData("INFO","ltk_patcher_dll::hooks::fsov::imp: redirected wad: DATA/FINAL/Champions/Ahri.wad.client",DllLineKind.Redirected)]
+    [InlineData("ERROR","ltk_patcher_dll::verify: WAD scan failed status with c0000229 for briar.wad.client",DllLineKind.Fatal)]
+    [InlineData("ERROR","ltk_patcher_dll::verify: overlay verification failed, disabling overlay: wad data/final/champions/briar.wad.client: anti-hack scan blocked (c0000229): 21a1",DllLineKind.Fatal)]
+    [InlineData("INFO","ltk_patcher_dll::entry: end of life reached, please update: 0x68a1b2c3",DllLineKind.Fatal)]
+    [InlineData("WARN","ltk_patcher_dll::entry: joined too late, not overlaying",DllLineKind.Warning)]
+    [InlineData("WARN","ltk_patcher_dll::verify: lazy verification failed, not overlaying: wad DATA/FINAL/Champions/Ahri.wad.client: invalid signature",DllLineKind.Warning)]
+    public void Dll_lines_only_stop_the_session_for_real_blocks(string level,string message,DllLineKind expected)=>Assert.Equal(expected,DllLines.Classify(level,message).Kind);
+    [Fact] public void Redirected_wads_report_the_archive_name()=>Assert.Equal("Ahri.wad.client",DllLines.Classify("INFO","redirected wad: DATA/FINAL/Champions/Ahri.wad.client").Text);
+    [Theory]
+    [InlineData(false,false,false,false)]
+    [InlineData(true,false,false,true)]
+    [InlineData(false,true,false,true)]
+    [InlineData(true,true,true,false)]
+    public void Elevation_matches_ltk_manager(bool optIn,bool leagueAdmin,bool appElevated,bool expected)=>Assert.Equal(expected,Elevation.Decide(optIn,leagueAdmin,appElevated));
     [Fact] public void Communitydragon_asset_paths_follow_the_documented_prefix_mapping()
     {
         Assert.Equal("https://raw.communitydragon.org/16.20/plugins/rcp-be-lol-game-data/global/default/assets/characters/ahri/a.jpg",MetadataProvider.AssetUrl("16.20","default","/lol-game-data/assets/ASSETS/Characters/Ahri/A.jpg"));

@@ -638,6 +638,16 @@
        </StackPanel>
       </Border>
       <Border Style="{StaticResource ResponsiveCard}" Margin="0,0,0,18">
+       <StackPanel>
+        <TextBlock Text="Patcher" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,4" />
+        <TextBlock Text="Changes apply the next time you press Start." Style="{StaticResource Muted}" FontSize="11" />
+        <CheckBox Content="Enforce anti-skinhack scan" IsChecked="{Binding EnforceSkinhackScan}" Margin="0,18,0,0" AutomationProperties.AutomationId="EnforceSkinhackScan" />
+        <TextBlock Text="Library skins are official skins, which League's scan always flags. Leave this off so they load in game. Turn it on only if you use custom skins and want flagged files blocked." Style="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0" />
+        <CheckBox Content="Run patcher as administrator" IsChecked="{Binding ElevatePatcher}" Margin="0,18,0,0" AutomationProperties.AutomationId="ElevatePatcher" />
+        <TextBlock Text="Only needed if League itself runs as administrator, which MadokaChanger detects and handles on its own. Turning this on shows a Windows prompt on every Start." Style="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0" />
+       </StackPanel>
+      </Border>
+      <Border Style="{StaticResource ResponsiveCard}" Margin="0,0,0,18">
        <Grid>
         <Grid.ColumnDefinitions>
          <ColumnDefinition Width="*" />

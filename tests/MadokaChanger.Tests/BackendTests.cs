@@ -7,7 +7,7 @@ namespace MadokaChanger.Tests;
 public sealed class BackendTests : IDisposable
 {
     private readonly string root=Path.Combine(Path.GetTempPath(),"MadokaChanger-backend-tests-"+Guid.NewGuid().ToString("N"));
-    private async Task<(PatcherController Controller,OperationGate Gate,StateStore State)> CreateAsync(string mode="normal",bool gameOpen=false,string backendRelative="backend")
+    private async Task<(PatcherController Controller,OperationGate Gate,StateStore State)> CreateAsync(string mode="normal",bool gameOpen=false,string backendRelative="backend",bool leagueAdmin=false,bool appElevated=false)
     {
         var paths=new AppPaths(root);var state=new StateStore(paths,NullLogger<StateStore>.Instance);await state.LoadAsync();
         var backend=Path.Combine(root,backendRelative);Directory.CreateDirectory(backend);
@@ -19,7 +19,7 @@ public sealed class BackendTests : IDisposable
         var library=new LibraryStore(state);var generation=Path.Combine(library.Root,"versions","fixture");Directory.CreateDirectory(generation);
         await library.ActivateAsync(generation,new("test","main",DateTimeOffset.UtcNow,"16.20",[new("fixture.fantome","sha",1,"Fixture","Author","1",103,103001,null,null,null,["a"],null)],[]),CancellationToken.None);
         var gate=new OperationGate();var native=new NativeBridge(NullLogger<NativeBridge>.Instance,fixture);
-        return(new(native,state,library,paths,gate,NullLogger<PatcherController>.Instance,new FakeGameEnvironment(gameOpen)),gate,state);
+        return(new(native,state,library,paths,gate,NullLogger<PatcherController>.Instance,new FakeGameEnvironment(gameOpen,leagueAdmin,appElevated)),gate,state);
     }
     [Theory]
     [InlineData("backend")]
@@ -31,7 +31,25 @@ public sealed class BackendTests : IDisposable
         Assert.Equal(PatcherState.Running,controller.Status.State);Assert.True(gate.IsBusy);Assert.Contains(PatcherState.Building,states);Assert.Contains(PatcherState.Starting,states);
         Assert.Equal(controller.ActiveConfiguration,controller.ConfigurationHash());state.State.Selections[103]=new(103,103002);Assert.NotEqual(controller.ActiveConfiguration,controller.ConfigurationHash());
         await controller.StopAsync();Assert.Equal(PatcherState.Stopped,controller.Status.State);Assert.False(gate.IsBusy);Assert.Null(controller.ActiveConfiguration);
-        var commands=await File.ReadAllLinesAsync(Path.Combine(root,backendRelative,"commands.log"));Assert.Contains("config flags 0",commands);Assert.Contains("start scan",commands);Assert.Contains("stop",commands);
+        var commands=await File.ReadAllLinesAsync(Path.Combine(root,backendRelative,"commands.log"));Assert.Contains("config flags 4",commands);Assert.Contains("start scan",commands);Assert.Contains("stop",commands);
+        Assert.DoesNotContain("--elevate",await File.ReadAllTextAsync(Path.Combine(root,backendRelative,"args.log")));
+    }
+    [Theory]
+    [InlineData(false,false,false,false)]
+    [InlineData(true,false,false,true)]
+    [InlineData(false,true,false,true)]
+    [InlineData(true,true,true,false)]
+    public async Task Host_elevates_only_when_asked_or_when_League_runs_as_admin(bool optIn,bool leagueAdmin,bool appElevated,bool expected)
+    {
+        var (controller,_,state)=await CreateAsync(leagueAdmin:leagueAdmin,appElevated:appElevated);state.State.Settings.ElevatePatcher=optIn;
+        await controller.StartAsync(null,CancellationToken.None);await controller.StopAsync();
+        Assert.Equal(expected,(await File.ReadAllTextAsync(Path.Combine(root,"backend","args.log"))).Contains("--elevate"));
+    }
+    [Fact] public async Task Enforcing_the_skinhack_scan_sends_flags_0()
+    {
+        var (controller,_,state)=await CreateAsync();state.State.Settings.EnforceSkinhackScan=true;
+        await controller.StartAsync(null,CancellationToken.None);await controller.StopAsync();
+        Assert.Contains("config flags 0",await File.ReadAllLinesAsync(Path.Combine(root,"backend","commands.log")));
     }
     [Fact] public async Task Backend_errors_cannot_be_reported_as_success_and_release_the_lease()
     {
@@ -71,7 +89,7 @@ public sealed class BackendTests : IDisposable
         Assert.Equal("en_us",state.State.Settings.Language);Assert.True(state.State.Settings.ReducedMotion);Assert.Contains(103,state.State.Favorites);
         Assert.DoesNotContain("backendFolder",await File.ReadAllTextAsync(Path.Combine(root,"settings.json")));
     }
-    private sealed class FakeGameEnvironment(bool isOpen):IGameEnvironment {public bool IsOpen=>isOpen;}
+    private sealed class FakeGameEnvironment(bool isOpen,bool leagueAdmin=false,bool appElevated=false):IGameEnvironment {public bool IsOpen=>isOpen;public bool LeagueRunsAsAdmin=>leagueAdmin;public bool AppIsElevated=>appElevated;}
     public void Dispose()
     {
         for(int attempt=0;attempt<20;attempt++)

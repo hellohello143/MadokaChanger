@@ -11,8 +11,21 @@ public sealed class NativeBridge(ILogger<NativeBridge> log, string? executable=n
     public string Executable { get; } = executable ?? Path.Combine(AppContext.BaseDirectory,"backend","madokachanger-ltk.exe");
     public bool Available => File.Exists(Executable);
     public string BackendDirectory => Path.GetDirectoryName(Path.GetFullPath(Executable))!;
-    public string HostExecutable => Path.Combine(BackendDirectory,"ltk_patcher_host.exe");
-    public bool BackendAvailable => Available && File.Exists(HostExecutable) && File.Exists(Path.Combine(BackendDirectory,"ltk_patcher_dll.dll"));
+    public string HostExecutable => Path.Combine(BackendDirectory,PatcherLocator.HostName);
+    private string BundledDll => Path.Combine(BackendDirectory,PatcherLocator.DllName);
+    // Only the shipped app looks for an installed LTK Manager; an explicit executable (tests, tools) stays self-contained.
+    private readonly bool searchInstalled = executable is null;
+    private PatcherBinaries? installed;
+    private bool searched;
+    public bool BackendAvailable => Available && ResolvePatcher() is not null;
+    public string PatcherDescription => ResolvePatcher()?.Description ?? "missing";
+    /// <summary>The signed patcher of an installed LTK Manager when there is one, else the bundled copy beside the adapter.</summary>
+    public PatcherBinaries? ResolvePatcher(bool refresh=false)
+    {
+        if(searchInstalled && (refresh || !searched)) { installed=PatcherLocator.FindInstalledLtkManager(); searched=true; }
+        if(installed is not null && File.Exists(installed.Host) && File.Exists(installed.Dll)) return installed;
+        return File.Exists(HostExecutable) && File.Exists(BundledDll) ? new(HostExecutable,BundledDll,false,"MadokaChanger") : null;
+    }
     public async Task<JsonDocument> InvokeAsync(object request,CancellationToken ct,IProgress<string>? progress=null)
     {
         if(!Available) throw new FileNotFoundException("The native LTK adapter is missing. Build native/ with Cargo and copy madokachanger-ltk.exe into backend/.",Executable);
@@ -51,24 +64,30 @@ public sealed class NativeBridge(ILogger<NativeBridge> log, string? executable=n
     }
 }
 
-public sealed record HostEvent(string Kind,string State,string Message)
+public sealed record HostEvent(string Kind,string State,string Message,string Level="")
 {
     public static HostEvent? Parse(string line)
     {
+        line=line.TrimEnd('\r','\n');
+        if(line.StartsWith("dll ",StringComparison.Ordinal))
+        {
+            // dll <timestamp> <pid> <tid> <level> <message...>
+            var d=line.Split(' ',6,StringSplitOptions.RemoveEmptyEntries);
+            return d.Length>=6 ? new("dll","",d[5],d[4]) : d.Length>=3 ? new("dll","",string.Join(' ',d.Skip(2))) : null;
+        }
         var p=line.Split(' ',4,StringSplitOptions.None);
         if(p.Length<3) return null;
         return p[0] switch
         {
             "status"=>new("status",p[2],p.Length>3?p[3]:""),
             "ok" or "error"=>new(p[0],"",string.Join(' ',p.Skip(2))),
-            "dll"=>new("dll","",string.Join(' ',p.Skip(2))),
             _=>null
         };
     }
-    public static string[] Configuration(string prefix)
+    public static string[] Configuration(string prefix,int flags)
     {
         if(prefix.Contains('\n') || prefix.Contains('\r')) throw new ArgumentException("Overlay path contains a protocol newline.");
-        return ["config loglevel 16","config flags 0","config prefix "+prefix.TrimEnd('\\','/')+Path.DirectorySeparatorChar,"start scan"];
+        return ["config loglevel 16","config flags "+flags,"config prefix "+prefix.TrimEnd('\\','/')+Path.DirectorySeparatorChar,"start scan"];
     }
 }
 
@@ -100,7 +119,12 @@ public static class GameLocator
     public static bool IsGameOpen() => Process.GetProcessesByName("League of Legends").Any(p=>{p.Dispose();return true;});
 }
 
-public interface IGameEnvironment { bool IsOpen { get; } }
+public interface IGameEnvironment
+{
+    bool IsOpen { get; }
+    bool LeagueRunsAsAdmin => Elevation.LeagueRunsAsAdmin();
+    bool AppIsElevated => Elevation.AppIsElevated();
+}
 public sealed class SystemGameEnvironment : IGameEnvironment { public bool IsOpen=>GameLocator.IsGameOpen(); }
 
 public sealed class PatcherController(NativeBridge native,StateStore state,LibraryStore library,AppPaths paths,OperationGate gate,ILogger<PatcherController> log,IGameEnvironment gameEnvironment)
@@ -114,6 +138,8 @@ public sealed class PatcherController(NativeBridge native,StateStore state,Libra
     private IDisposable? lease;
     private Task? monitor;
     private bool stopping;
+    private PatcherBinaries? binaries;
+    private readonly HashSet<string> redirected=new(StringComparer.OrdinalIgnoreCase);
     public bool IsActive => Status.State is PatcherState.Running or PatcherState.Building or PatcherState.Starting;
     public string ConfigurationHash()
     {
@@ -138,9 +164,9 @@ public sealed class PatcherController(NativeBridge native,StateStore state,Libra
         try
         {
             if(host is not null || IsActive) throw new InvalidOperationException("Stop the current session before rebuilding.");
-            if(!native.BackendAvailable) throw new FileNotFoundException("The built-in backend is incomplete. Extract the full MadokaChanger download again, keeping its backend folder beside the app.");
-            var backend=native.BackendDirectory;
-            var exe=native.HostExecutable;
+            var patcherFiles=native.Available ? native.ResolvePatcher(refresh:true) : null;
+            if(patcherFiles is null) throw new FileNotFoundException("The built-in backend is incomplete. Extract the full MadokaChanger download again, keeping its backend folder beside the app.");
+            binaries=patcherFiles;
             var game=state.State.Settings.GameFolder;
             if(!GameLocator.Validate(game)) throw new DirectoryNotFoundException("Choose a League Game folder containing League of Legends.exe and DATA/FINAL.");
             if(gameEnvironment.IsOpen) throw new InvalidOperationException("Close the League game before building a new overlay.");
@@ -168,13 +194,19 @@ public sealed class PatcherController(NativeBridge native,StateStore state,Libra
                 log.LogInformation("Built overlay: {Result}",result.RootElement.ToString());
             ct.ThrowIfCancellationRequested(); Set(PatcherState.Starting,"Waiting for the LTK host to confirm scanning");
             var started=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var process=new Process { StartInfo=new(exe) { WorkingDirectory=backend,UseShellExecute=false,CreateNoWindow=true,RedirectStandardInput=true,RedirectStandardOutput=true,RedirectStandardError=true } };
-            // --elevate is the verified upstream host argument. Elevation is handled by that official host.
-            process.StartInfo.ArgumentList.Add("--elevate");
+            var process=new Process { StartInfo=new(patcherFiles.Host) { WorkingDirectory=patcherFiles.Directory,UseShellExecute=false,CreateNoWindow=true,RedirectStandardInput=true,RedirectStandardOutput=true,RedirectStandardError=true } };
+            // Same rule as ltk-manager: --elevate (a UAC prompt) only when asked for or when League itself runs as admin.
+            var settings=state.State.Settings;
+            bool leagueAdmin=gameEnvironment.LeagueRunsAsAdmin,appElevated=gameEnvironment.AppIsElevated;
+            var elevate=Elevation.Decide(settings.ElevatePatcher,leagueAdmin,appElevated);
+            var flags=HookFlags.For(settings);
+            log.LogInformation("Patcher: {Patcher}; elevate={Elevate} (opt_in={OptIn}, league_admin={LeagueAdmin}, app_elevated={AppElevated}); flags={Flags}",patcherFiles.Description,elevate,settings.ElevatePatcher,leagueAdmin,appElevated,flags);
+            if(elevate) process.StartInfo.ArgumentList.Add("--elevate");
+            redirected.Clear();
             if(!process.Start()) throw new IOException("LTK host could not start."); host=process;
             job=ProcessJob.Attach(process,0);
             monitor=MonitorAsync(process,started);
-            foreach(var line in HostEvent.Configuration(overlay)) await process.StandardInput.WriteLineAsync(line.AsMemory(),ct);
+            foreach(var line in HostEvent.Configuration(overlay,flags)) await process.StandardInput.WriteLineAsync(line.AsMemory(),ct);
             await process.StandardInput.FlushAsync(ct);
             await started.Task.WaitAsync(TimeSpan.FromSeconds(30),ct);
             ActiveConfiguration=config; Set(PatcherState.Running,"Running · scanning for League (in-game effects are not confirmed)");
@@ -196,17 +228,21 @@ public sealed class PatcherController(NativeBridge native,StateStore state,Libra
             {
                 log.LogInformation("LTK host: {Line}",line);
                 var e=HostEvent.Parse(line); if(e is null) continue;
-                if(e.Kind=="error" || e.State=="failed" || (e.Kind=="dll" && (e.Message.Contains("WAD scan failed",StringComparison.OrdinalIgnoreCase) || e.Message.Contains("overlay verification failed",StringComparison.OrdinalIgnoreCase) || e.Message.Contains("AH init failed",StringComparison.OrdinalIgnoreCase) || e.Message.Contains("not overlaying",StringComparison.OrdinalIgnoreCase) || e.Message.Contains("end of life reached",StringComparison.OrdinalIgnoreCase))))
+                var verdict=e.Kind=="dll" ? DllLines.Classify(e.Level,e.Message) : null;
+                if(e.Kind=="error" || e.State=="failed" || verdict?.Kind==DllLineKind.Fatal)
                 {
-                    var error=new IOException("LTK rejected the session: "+e.Message); started.TrySetException(error); Set(PatcherState.Error,error.Message);
+                    var error=new IOException("LTK rejected the session: "+(verdict?.Text ?? e.Message)+FailureHint(e)); started.TrySetException(error); Set(PatcherState.Error,error.Message);
                     await process.StandardInput.WriteLineAsync("stop"); process.StandardInput.Close(); break;
                 }
+                if(verdict?.Kind==DllLineKind.Warning && ActiveConfiguration is not null) { log.LogWarning("Patcher: {Warning}",verdict.Text); Set(PatcherState.Running,verdict.Text); }
+                if(verdict?.Kind==DllLineKind.Redirected && ActiveConfiguration is not null && redirected.Add(verdict.Text))
+                    Set(PatcherState.Running,$"In game · skins applied ({redirected.Count} archive{(redirected.Count==1?"":"s")} redirected)");
                 if(e.Kind=="status" && e.State is "injecting" or "injected" or "waiting")
                 {
                     started.TrySetResult();
                     if(ActiveConfiguration is not null) Set(PatcherState.Running,e.State=="injecting"?"Running · scanning for League":$"Host {e.State} · {e.Message}");
                 }
-                if(e.State=="exited" && ActiveConfiguration is not null) Set(PatcherState.Running,"Game exited · scanning for the next game");
+                if(e.State=="exited" && ActiveConfiguration is not null) { redirected.Clear(); Set(PatcherState.Running,"Game exited · scanning for the next game"); }
             }
             await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5)); await stderr;
             if(!stopping) { started.TrySetException(new IOException("LTK host exited before confirming startup. Check logs and backend compatibility.")); if(Status.State!=PatcherState.Error) Set(PatcherState.Error,"LTK host exited unexpectedly; inspect logs."); }
@@ -242,6 +278,13 @@ public sealed class PatcherController(NativeBridge native,StateStore state,Libra
             p.Dispose();
         }
         monitor=null; job?.Dispose(); job=null;
+    }
+    private string FailureHint(HostEvent e)
+    {
+        if(!e.Message.Contains("SetWindowsHookEx",StringComparison.OrdinalIgnoreCase) && !e.Message.Contains("hook install",StringComparison.OrdinalIgnoreCase)) return "";
+        return binaries is { Signed: false }
+            ? " · MadokaChanger is using its bundled unsigned patcher. Install LTK Manager (github.com/LeagueToolkit/ltk-manager) and MadokaChanger will use its signed patcher automatically."
+            : " · If League is set to run as administrator, turn on \"Run patcher as administrator\" in Settings.";
     }
     private void Set(PatcherState value,string message) { Status=new(value,message); StatusChanged?.Invoke(Status); }
 }

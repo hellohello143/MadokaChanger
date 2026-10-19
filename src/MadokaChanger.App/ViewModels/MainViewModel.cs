@@ -93,6 +93,8 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private string libraryFolder="";
     [ObservableProperty] private string language="default";
     [ObservableProperty] private bool reducedMotion;
+    [ObservableProperty] private bool enforceSkinhackScan;
+    [ObservableProperty] private bool elevatePatcher;
     [ObservableProperty] private ConflictChoice conflictChoice;
     public ObservableCollection<ChampionRow> ChampionRows { get; }=[];
     public ObservableCollection<ChampionCard> CustomChampions { get; }=[];
@@ -127,7 +129,7 @@ public sealed partial class MainViewModel : ObservableObject
     public string PatcherLabel=>patcher.Status.State==PatcherState.Stopped&&!BackendReady?"Unavailable":patcher.Status.State.ToString();
     public string PatcherDetail=>patcher.Status.Message;
     public string GameStatus=>GameLocator.Validate(Store.State.Settings.GameFolder)?"League installation found":"League folder needed";
-    public string DependencyStatus=>$"Built-in backend: {(BackendReady?"ready — no setup needed":"incomplete — extract the full MadokaChanger download again")}\nMetadata: {catalog?.Patch??"unavailable"} / {catalog?.Language??Language}";
+    public string DependencyStatus=>$"Built-in backend: {(BackendReady?"ready — no setup needed":"incomplete — extract the full MadokaChanger download again")}\nPatcher: {native.PatcherDescription}\nMetadata: {catalog?.Patch??"unavailable"} / {catalog?.Language??Language}";
     public bool CanUpdate=>!IsBusy&&!patcher.IsActive&&catalog is not null;
     public bool CanStart=>!IsBusy&&!patcher.IsActive&&BackendReady&&GameLocator.Validate(Store.State.Settings.GameFolder);
     public bool CanStop=>patcher.IsActive || patcher.Status.State==PatcherState.Error;
@@ -170,7 +172,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         await Store.LoadAsync(); var s=Store.State.Settings;
         GameFolder=s.GameFolder.Length>0?s.GameFolder:GameLocator.Detect()??""; s.GameFolder=GameFolder;
-        LibraryFolder=s.LibraryFolder; Language=s.Language; ReducedMotion=s.ReducedMotion; changing=true;ConflictChoice=Store.State.ConflictChoice;changing=false;
+        LibraryFolder=s.LibraryFolder; Language=s.Language; ReducedMotion=s.ReducedMotion; changing=true;ConflictChoice=Store.State.ConflictChoice;EnforceSkinhackScan=s.EnforceSkinhackScan;ElevatePatcher=s.ElevatePatcher;changing=false;
         await RunAsync(async ct=>
         {
             try {await library.LoadAsync(ct);} catch(Exception e) when(e is IOException or System.Text.Json.JsonException) {log.LogError(e,"Library manifest could not be loaded");Message=e.Message;}
@@ -260,6 +262,19 @@ public sealed partial class MainViewModel : ObservableObject
         if(changing)return;
         Store.State.ConflictChoice=value;
         _=PersistAsync();OnPropertyChanged(nameof(ActiveText));
+    }
+    // Patcher options save as soon as they change and apply on the next Start, like the conflict priority.
+    partial void OnEnforceSkinhackScanChanged(bool value)
+    {
+        if(changing)return;
+        Store.State.Settings.EnforceSkinhackScan=value;_=PersistAsync();
+        Message=value?"Anti-skinhack scan enforced. Library skins are official skins and will be blocked in game; custom skins still load.":"Anti-skinhack scan off. Library skins load in game from the next Start.";HasError=false;
+    }
+    partial void OnElevatePatcherChanged(bool value)
+    {
+        if(changing)return;
+        Store.State.Settings.ElevatePatcher=value;_=PersistAsync();
+        Message=value?"The patcher will ask for administrator access on every Start.":"The patcher runs without administrator access unless League itself is set to run as administrator.";HasError=false;
     }
     private async Task<bool> PersistAsync() {try{await Store.SaveAsync();return true;}catch(Exception e){ShowError(e);return false;}}
     private void NotifyPreview()
@@ -362,7 +377,7 @@ public sealed partial class MainViewModel : ObservableObject
             if(game.Length>0&&!GameLocator.Validate(game))throw new InvalidOperationException("League folder must contain League of Legends.exe and DATA/FINAL.");
             var root=Path.GetFullPath(LibraryFolder);Directory.CreateDirectory(root);
             if(new[]{paths.Custom,paths.Metadata,paths.Images,paths.Temporary,paths.Overlay,paths.Logs}.Any(p=>root.Equals(p,StringComparison.OrdinalIgnoreCase)||root.StartsWith(p+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase)))throw new InvalidOperationException("Choose a separate library directory.");
-            Store.State.Settings=new(){GameFolder=game,LibraryFolder=root,Language=Language,ReducedMotion=ReducedMotion};await Store.SaveAsync();
+            Store.State.Settings=new(){GameFolder=game,LibraryFolder=root,Language=Language,ReducedMotion=ReducedMotion,EnforceSkinhackScan=EnforceSkinhackScan,ElevatePatcher=ElevatePatcher};await Store.SaveAsync();
             GameFolder=game;await library.LoadAsync();NotifyLibrary();OnPropertyChanged(nameof(GameStatus));Message="Settings saved. Refresh metadata after changing language. Existing libraries stay in their original folders.";HasError=false;
         }catch(Exception e){ShowError(e);}
     }
