@@ -148,11 +148,11 @@ public sealed class CoreTests : IDisposable
     {
         public string Commit="a";public int Fetches;public bool Invalid;public Action? AfterFetch;
         public Task<RepositoryRevision> ResolveAsync(CancellationToken ct)=>Task.FromResult(new RepositoryRevision("main",Commit,[FileRecord("skins/103/103001/103001.fantome"),FileRecord("skins/103/103001/103052/103052.fantome")]));
-        public async Task FetchAsync(RepositoryRevision revision,RepositoryFile file,string destination,Action<long> transferred,CancellationToken ct)
+        public async Task<RepositoryFile> FetchAsync(RepositoryRevision revision,RepositoryFile file,string destination,Action<long> transferred,CancellationToken ct)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);Interlocked.Increment(ref Fetches);
             if(Invalid)await System.IO.File.WriteAllTextAsync(destination,"invalid archive",ct);else System.IO.File.Copy(source,destination);
-            transferred(new FileInfo(destination).Length);AfterFetch?.Invoke();ct.ThrowIfCancellationRequested();
+            transferred(new FileInfo(destination).Length);AfterFetch?.Invoke();ct.ThrowIfCancellationRequested();return file;
         }
     }
     public void Dispose(){if(Directory.Exists(root))Directory.Delete(root,true);}

@@ -52,9 +52,9 @@ public sealed class ClassicRemovalTests : IDisposable
         public int Downloads;
         public Task<RepositoryRevision> ResolveAsync(CancellationToken ct)=>Task.FromResult(new RepositoryRevision("main",new string('a',40),
             [new("skins/103/103001/103001.fantome","a",1),new("classic/60103/103001/103001.fantome","b",1)]));
-        public Task FetchAsync(RepositoryRevision revision,RepositoryFile file,string destination,Action<long> transferred,CancellationToken ct)
+        public Task<RepositoryFile> FetchAsync(RepositoryRevision revision,RepositoryFile file,string destination,Action<long> transferred,CancellationToken ct)
         {
-            Assert.False(CatalogPolicy.IsClassicRepositoryPath(file.Path));Directory.CreateDirectory(Path.GetDirectoryName(destination)!);File.Copy(package,destination);Downloads++;transferred(new FileInfo(destination).Length);return Task.CompletedTask;
+            Assert.False(CatalogPolicy.IsClassicRepositoryPath(file.Path));Directory.CreateDirectory(Path.GetDirectoryName(destination)!);File.Copy(package,destination);Downloads++;transferred(new FileInfo(destination).Length);return Task.FromResult(file);
         }
     }
     public void Dispose(){if(Directory.Exists(root))Directory.Delete(root,true);}

@@ -186,6 +186,9 @@ public sealed partial class MainViewModel : ObservableObject
             RemoveClassicPreferences();
             PopulateChampions(); Message=metadata.IsOffline?"Offline · cached collection available":"Your collection is ready. Choose a champion to preview skins.";
             await Store.SaveAsync(ct); NotifyLibrary();
+            if(await installer.MigrateAsync(new Progress<TransferProgress>(p=>{Activity=p.Display;Progress=p.Percent;}),ct) is { } migrated)
+                log.LogInformation("{Migration}",migrated);
+            NotifyLibrary();
         });
         OnPropertyChanged(nameof(DependencyStatus)); OnPropertyChanged(nameof(GameStatus));
         _=CheckUpdatesQuietlyAsync();

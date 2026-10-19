@@ -28,17 +28,20 @@
 - **Your own custom skins.** Import supported `.fantome`, `.modpkg` and Fantome ZIP packages, review conflicts, and enable or uninstall imports.
 - **A dark desktop experience.** Pink and plum styling, a chibi icon, compact navigation, responsive panels and reduced-motion support.
 - **Recoverable library updates.** Downloads are validated and staged before activation. An interrupted update keeps the previous working library.
+- **Local storage obfuscation.** Downloaded packages use opaque filenames and package name metadata while the app retains original names and selections. This does not establish user security or encrypt package content.
 
 ## Install
 
 1. Open the [latest release](https://github.com/hellohello143/MadokaChanger/releases/latest).
-2. Download **MadokaChanger-Setup-1.0.1.exe** and run it.
+2. Download **MadokaChanger-Setup-1.1.0.exe** and run it.
 3. Choose the installation folder and whether to create a desktop shortcut.
 4. Launch **MadokaChanger** from the desktop or Start menu.
 
 Requires **Windows 10/11 x64**. The installer includes .NET 10 and installs for the current user; installation does not require administrator access. Starting a session does not ask for administrator access either, unless League itself is set to run as administrator or you turn on **Run patcher as administrator** in Settings. If LTK Manager is installed, MadokaChanger uses its signed patcher automatically. This release is unsigned; SHA-256 checksums are attached to the release.
 
 The default installation is `%LOCALAPPDATA%\Programs\MadokaChanger`. Uninstall through Windows **Installed apps**. Settings, downloaded skins and imported content are kept separately and preserved when uninstalling.
+
+The release also includes the existing **MadokaChanger-Uninstaller.exe** for cleaning up old installed or portable copies. Run it before installing the new version if you need that cleanup; it keeps skins and settings unless you select their deletion. It matches copies by name and can also remove the new version.
 
 ## Getting started
 
@@ -59,7 +62,7 @@ cd MadokaChanger
 
 ./scripts/build-native.ps1
 ./scripts/publish.ps1
-./scripts/build-installer.ps1 -Version 1.0.1
+./scripts/build-installer.ps1 -Version 1.1.0
 ```
 
 The published app appears in `artifacts/win-x64/`; the installer and checksums appear in `artifacts/installer/`. If Inno Setup is outside its default location, pass `-CompilerPath "C:\path\to\ISCC.exe"`.

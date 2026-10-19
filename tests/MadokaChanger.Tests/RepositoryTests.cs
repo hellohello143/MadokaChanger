@@ -39,8 +39,9 @@ public sealed class RepositoryTests
                 var url=request.RequestUri!.AbsoluteUri;urls.Add(url);return new(HttpStatusCode.OK){Content=new ByteArrayContent(url.Contains("media.githubusercontent.com")?payload:pointer)};
             }));
             var repo=new GitHubRepository(new RemoteClient(http,NullLogger<RemoteClient>.Instance));var file=new RepositoryFile("skins/103/103001/103001.fantome",Convert.ToHexString(blob).ToLowerInvariant(),pointer.Length);
-            var dest=Path.Combine(root,"package.fantome");await repo.FetchAsync(new("main",commit,[file]),file,dest,_=>{},CancellationToken.None);
+            var dest=Path.Combine(root,"package.fantome");var verified=await repo.FetchAsync(new("main",commit,[file]),file,dest,_=>{},CancellationToken.None);
             Assert.Equal(payload,await File.ReadAllBytesAsync(dest));Assert.Equal(2,urls.Count);Assert.All(urls,url=>Assert.Contains(commit,url));
+            Assert.Equal(file.Sha,verified.Sha);Assert.Equal(pointer.Length,verified.Size);Assert.Equal(oid,verified.LfsOid);Assert.Equal(payload.Length,verified.LfsSize);
         }
         finally{Directory.Delete(root,true);}
     }

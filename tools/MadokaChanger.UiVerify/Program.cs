@@ -25,8 +25,19 @@ internal static class Program
             try
             {
                 using var services=App.CreateServices(Path.GetFullPath(args[0]));
+                await services.GetRequiredService<StateStore>().LoadAsync();
+                var library=services.GetRequiredService<LibraryStore>();await library.LoadAsync();
+                var originalIdentity=library.Manifest?.Packages.OrderBy(p=>p.Path,StringComparer.Ordinal).Select(p=>new{p.Path,p.Name,p.Author,p.Version,p.Selection,p.Preview}).ToList();
                 var vm=services.GetRequiredService<MainViewModel>();await vm.InitializeAsync();
-                if(!vm.BackendReady || !vm.DependencyStatus.Contains("no setup needed"))throw new Exception("The complete built-in backend must be ready without configuring a folder.");
+                if(originalIdentity is not null)
+                {
+                    if(library.Manifest is null || !PackageTransformer.IsCurrent(library.Manifest))throw new Exception("Startup did not complete the versioned library storage migration: "+vm.Message);
+                    if(!originalIdentity.SequenceEqual(library.Manifest.Packages.OrderBy(p=>p.Path,StringComparer.Ordinal).Select(p=>new{p.Path,p.Name,p.Author,p.Version,p.Selection,p.Preview})))
+                        throw new Exception("Storage migration changed frontend package identities or selection mappings.");
+                    if(library.Manifest.Packages.Any(p=>!File.Exists(library.GetPackagePath(p))))throw new Exception("A renamed package could not be resolved through its manifest.");
+                    Console.WriteLine("PASS startup storage migration, original display identities, selection mappings and renamed package resolution");
+                }
+                if(!vm.BackendReady || !vm.DependencyStatus.Contains("Built-in backend: ready"))throw new Exception("The complete built-in backend must be ready without configuring a folder.");
                 if(vm.IsEmpty)throw new Exception("No champion metadata loaded: "+vm.Message);
                 if(vm.CustomChampions.Any(c=>CatalogPolicy.IsClassicChampion(c.Model.Alias)))throw new Exception("Classic entries leaked into the champion list.");
                 var window=services.GetRequiredService<MainWindow>();

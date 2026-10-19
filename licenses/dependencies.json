@@ -2484,5 +2484,55 @@
     "texts": [
       "licenses/managed/System.IO.Hashing-10.0.0/THIRD-PARTY-NOTICES.TXT"
     ]
+  },
+  {
+    "ecosystem": "NuGet",
+    "name": "MessagePack",
+    "version": "3.1.12",
+    "license": "MIT",
+    "source": "https://www.nuget.org/packages/MessagePack/3.1.12",
+    "texts": [
+      "licenses/managed/MessagePack-3.1.12/LICENSE"
+    ]
+  },
+  {
+    "ecosystem": "NuGet",
+    "name": "MessagePack.Annotations",
+    "version": "3.1.12",
+    "license": "MIT",
+    "source": "https://www.nuget.org/packages/MessagePack.Annotations/3.1.12",
+    "texts": [
+      "licenses/managed/MessagePack-3.1.12/LICENSE"
+    ]
+  },
+  {
+    "ecosystem": "NuGet",
+    "name": "MessagePackAnalyzer",
+    "version": "3.1.12",
+    "license": "MIT",
+    "source": "https://www.nuget.org/packages/MessagePackAnalyzer/3.1.12",
+    "texts": [
+      "licenses/managed/MessagePack-3.1.12/LICENSE"
+    ]
+  },
+  {
+    "ecosystem": "NuGet",
+    "name": "ZstdSharp.Port",
+    "version": "0.8.8",
+    "license": "MIT",
+    "source": "https://www.nuget.org/packages/ZstdSharp.Port/0.8.8",
+    "texts": [
+      "licenses/managed/ZstdSharp.Port-0.8.8/LICENSE"
+    ]
+  },
+  {
+    "ecosystem": "NuGet",
+    "name": "Microsoft.NET.StringTools",
+    "version": "17.11.4",
+    "license": "MIT",
+    "source": "https://www.nuget.org/packages/Microsoft.NET.StringTools/17.11.4",
+    "texts": [
+      "licenses/managed/Microsoft.NET.StringTools-17.11.4/LICENSE"
+    ]
   }
 ]

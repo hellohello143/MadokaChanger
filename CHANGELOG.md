@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.0
+
+- Downloaded library packages now use opaque local filenames and package name metadata, while original skin names, previews, chromas, forms, favorites and saved selections remain unchanged in the app.
+- Source Git/LFS integrity is verified before rewriting; final package SHA-256 and size are stored separately. Payload bytes and override sets are checked before activation.
+- Existing libraries migrate transactionally at their installed commit, with no new upstream commit required. Already transformed libraries are reused on restart.
+- The release includes the existing standalone **MadokaChanger-Uninstaller.exe** for cleaning up old installed or portable copies before installing the new version. Skins and settings are kept by default.
+
+Local storage obfuscation does not provide encryption or a user-security guarantee. Signed or unsupported modpkg packages are refused without replacing the working library.
+
+Validation: 150 automated tests, native package round-trip checks, off-screen WPF checks, and an isolated installer/upgrade/uninstall smoke test.
+
 ## 1.0.1
 
 - Starting a session no longer asks for administrator access every time. The patcher is elevated only when League runs as administrator or **Run patcher as administrator** is turned on in Settings.

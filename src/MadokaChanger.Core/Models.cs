@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using System.Text.Json;
 
 namespace MadokaChanger.Core;
 
@@ -15,10 +16,24 @@ public sealed record RepositoryRevision(string Branch, string Commit, List<Repos
 public sealed record PackageRecord(string Path, string Sha, long Size, string Name, string Author, string Version,
     int? ChampionId, int? SkinId, int? ChromaId, string? Form, string? Preview, List<string> Overrides, string? MappingError)
 {
+    // Path/Sha/Size always describe the repository blob (the pointer for LFS), never the rewritten file.
+    public string? LfsOid { get; init; }
+    public long? LfsSize { get; init; }
+    public string? StoragePath { get; init; }
+    public string? LocalSha256 { get; init; }
+    public long? LocalSize { get; init; }
+    public int TransformationVersion { get; init; }
+    public string Description { get; init; } = "";
+    public List<string> Champions { get; init; } = [];
+    public JsonElement? OriginalMetadata { get; init; }
     [JsonIgnore] public Selection? Selection => ChampionId is { } c && SkinId is { } s && MappingError is null ? new(c,s,ChromaId,Form) : null;
 }
 public sealed record LibraryManifest(string Commit, string Branch, DateTimeOffset Installed, string MetadataPatch,
-    List<PackageRecord> Packages, List<RepositoryFile> Files);
+    List<PackageRecord> Packages, List<RepositoryFile> Files)
+{
+    // Missing in legacy manifests, which deserialize as version zero and require a staged migration.
+    public int TransformationVersion { get; init; }
+}
 public sealed record LibraryPointer(string Directory, string Commit);
 public sealed record CustomSkin(string Id, int ChampionId, string Name, string Author, string Version, string Description,
     string Sha256, string FileName, string ProjectPath, List<string> Overrides, bool Enabled = false);
@@ -50,4 +65,4 @@ public sealed class UserState
     public ConflictChoice ConflictChoice { get; set; } = ConflictChoice.Reject;
 }
 public sealed record PackageInspection(string Name, string Author, string Version, string Description,
-    List<string> Champions, List<string> Overrides, long ExpandedBytes);
+    List<string> Champions, List<string> Overrides, long ExpandedBytes, JsonElement? Metadata = null);

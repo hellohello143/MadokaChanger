@@ -83,7 +83,7 @@ public sealed class PackageValidator(NativeBridge native)
             }
             var j=r.GetProperty("project");
             return new(MetadataProvider.Text(j,"display_name"),Join(j,"authors"),MetadataProvider.Text(j,"version"),MetadataProvider.Text(j,"description"),
-                Strings(j,"champions"),Strings(r,"overrides"),r.GetProperty("bytes").GetInt64());
+                Strings(j,"champions"),Strings(r,"overrides"),r.GetProperty("bytes").GetInt64(),j.Clone());
         }
         return await Task.Run(async ()=>
         {
@@ -116,7 +116,7 @@ public sealed class PackageValidator(NativeBridge native)
             if(expanded>ArchiveSafety.MaximumExpandedBytes) throw new InvalidDataException("WAD content exceeds extraction limits.");
             string Text(string key)=>MetadataProvider.Text(info.RootElement,key);
             if(string.IsNullOrWhiteSpace(Text("Name"))) throw new InvalidDataException("Package metadata is missing Name.");
-            return new PackageInspection(Text("Name"),Text("Author"),Text("Version"),Text("Description"),[],hashes.ToList(),Math.Max(expanded,zip.Entries.Sum(e=>e.Length)));
+            return new PackageInspection(Text("Name"),Text("Author"),Text("Version"),Text("Description"),[],hashes.ToList(),Math.Max(expanded,zip.Entries.Sum(e=>e.Length)),info.RootElement.Clone());
         },ct);
     }
     private static long ReadWad(Stream stream,HashSet<string> hashes)
@@ -145,7 +145,8 @@ public sealed class PackageValidator(NativeBridge native)
         return XxHash64.HashToUInt64(Encoding.UTF8.GetBytes(path.Replace('\\','/').ToLowerInvariant())).ToString("x16");
     }
     private static List<string> Strings(JsonElement j,string key) => j.TryGetProperty(key,out var a)&&a.ValueKind==JsonValueKind.Array ? a.EnumerateArray().Select(x=>x.GetString()??"").ToList():[];
-    private static string Join(JsonElement j,string key)=>string.Join(", ",Strings(j,key));
+    private static string Join(JsonElement j,string key)=>j.TryGetProperty(key,out var a)&&a.ValueKind==JsonValueKind.Array
+        ? string.Join(", ",a.EnumerateArray().Select(x=>x.ValueKind==JsonValueKind.String?x.GetString():MetadataProvider.Text(x,"name"))) : "";
 }
 
 public static class PackageMapper
@@ -179,7 +180,10 @@ public static class PackageMapper
         }
         var basePreview=Path.ChangeExtension(file.Path,".png").Replace('\\','/');
         if(paths.Contains(basePreview)) preview=basePreview;
-        return new(file.Path,file.Sha,file.Size,inspection.Name,inspection.Author,inspection.Version,c,s,chroma,form,preview,inspection.Overrides,error);
+        return new(file.Path,file.Sha,file.Size,inspection.Name,inspection.Author,inspection.Version,c,s,chroma,form,preview,inspection.Overrides,error)
+        {
+            LfsOid=file.LfsOid,LfsSize=file.LfsSize,Description=inspection.Description,Champions=inspection.Champions,OriginalMetadata=inspection.Metadata
+        };
     }
     public static List<PackageRecord> RejectAmbiguities(List<PackageRecord> records)
     {

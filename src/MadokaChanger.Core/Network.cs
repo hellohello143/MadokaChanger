@@ -146,7 +146,8 @@ public sealed class ImageCache(RemoteClient remote, AppPaths paths)
 public interface IRepositorySource
 {
     Task<RepositoryRevision> ResolveAsync(CancellationToken ct);
-    Task FetchAsync(RepositoryRevision revision, RepositoryFile file, string destination, Action<long> transferred, CancellationToken ct);
+    // Returns the verified source identity, including LFS information discovered in a verified pointer.
+    Task<RepositoryFile> FetchAsync(RepositoryRevision revision, RepositoryFile file, string destination, Action<long> transferred, CancellationToken ct);
 }
 
 public sealed class GitHubRepository(RemoteClient remote) : IRepositorySource
@@ -189,18 +190,11 @@ public sealed class GitHubRepository(RemoteClient remote) : IRepositorySource
             }
     }
     public static bool IsPackage(string path) => Path.GetExtension(path).ToLowerInvariant() is ".fantome" or ".modpkg" or ".zip";
-    public async Task FetchAsync(RepositoryRevision r,RepositoryFile f,string destination,Action<long> transferred,CancellationToken ct)
+    public async Task<RepositoryFile> FetchAsync(RepositoryRevision r,RepositoryFile f,string destination,Action<long> transferred,CancellationToken ct)
     {
         var encoded=string.Join('/',f.Path.Split('/').Select(Uri.EscapeDataString));
         await remote.DownloadAsync($"https://raw.githubusercontent.com/{Repository}/{r.Commit}/{encoded}",destination,ct,transferred);
-        if(new FileInfo(destination).Length!=f.Size) throw new InvalidDataException($"Download size mismatch: {f.Path}");
-        await using(var s=File.OpenRead(destination))
-        {
-            using var hash=IncrementalHash.CreateHash(HashAlgorithmName.SHA1);
-            hash.AppendData(Encoding.UTF8.GetBytes($"blob {s.Length}\0"));
-            var buffer=new byte[65536]; for(int n;(n=await s.ReadAsync(buffer,ct))>0;) hash.AppendData(buffer,0,n);
-            if(!Convert.ToHexString(hash.GetHashAndReset()).Equals(f.Sha,StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException($"Git blob checksum mismatch: {f.Path}");
-        }
+        await SourceIntegrity.VerifyAsync(f with { LfsOid=null,LfsSize=null },destination,ct);
         if(f.Size<1024)
         {
             var text=await File.ReadAllTextAsync(destination,ct);
@@ -209,9 +203,33 @@ public sealed class GitHubRepository(RemoteClient remote) : IRepositorySource
                 var oid=Regex.Match(text,@"oid sha256:([0-9a-f]{64})").Groups[1].Value;
                 if(!long.TryParse(Regex.Match(text,@"size (\d+)").Groups[1].Value,out var size) || oid.Length!=64) throw new InvalidDataException("Invalid Git LFS pointer.");
                 await remote.DownloadAsync($"https://media.githubusercontent.com/media/{Repository}/{r.Commit}/{encoded}",destination,ct,transferred);
-                await using var actual=File.OpenRead(destination);
-                if(actual.Length!=size || !Convert.ToHexString(await SHA256.HashDataAsync(actual,ct)).Equals(oid,StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException($"Git LFS verification failed: {f.Path}");
+                var verified=f with { LfsOid=oid,LfsSize=size };
+                await SourceIntegrity.VerifyAsync(verified,destination,ct);
+                return verified;
             }
         }
+        if(f.LfsOid is not null) throw new InvalidDataException($"Expected a Git LFS pointer: {f.Path}");
+        return f;
+    }
+}
+
+public static class SourceIntegrity
+{
+    public static async Task VerifyAsync(RepositoryFile source,string path,CancellationToken ct)
+    {
+        await using var stream=File.OpenRead(path);
+        if(source.LfsOid is { } oid)
+        {
+            if(source.LfsSize!=stream.Length || !Convert.ToHexString(await SHA256.HashDataAsync(stream,ct)).Equals(oid,StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException($"Git LFS verification failed: {source.Path}");
+            return;
+        }
+        if(stream.Length!=source.Size) throw new InvalidDataException($"Download size mismatch: {source.Path}");
+        using var hash=IncrementalHash.CreateHash(HashAlgorithmName.SHA1);
+        hash.AppendData(Encoding.UTF8.GetBytes($"blob {stream.Length}\0"));
+        var buffer=new byte[65536];
+        for(int n;(n=await stream.ReadAsync(buffer,ct))>0;) hash.AppendData(buffer,0,n);
+        if(!Convert.ToHexString(hash.GetHashAndReset()).Equals(source.Sha,StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException($"Git blob checksum mismatch: {source.Path}");
     }
 }

@@ -2,6 +2,8 @@
 
 Retain this file and the accompanying `licenses/` directory with binary distributions.
 
+The local package metadata adapters use MessagePack 3.1.12 (including MessagePack.Annotations and the build-time MessagePackAnalyzer), ZstdSharp.Port 0.8.8, and Microsoft.NET.StringTools 17.11.4, all under MIT. Their exact upstream license texts are included under `licenses/managed/` and indexed in `licenses/dependencies.json`.
+
 MadokaChanger first-party source and its serialization shim are licensed under Apache-2.0; see LICENSE. This build links the League Mod Toolkit libraries at commit acaf19e5e1e32ff11376f0af1bccfbaecc28026d. Their upstream lockfile and Cargo.lock pin transitive versions.
 
 LTK Manager source is GPL-3.0-or-later and was inspected as a protocol reference. LeagueToolkit C# is GPL-3.0 and was inspected for asset format facts. Neither source nor assembly is included in this application. The GPL reference text and separate LTK Patcher License are included. The patcher host and DLL from commit 1a3d4f900054a739f833b6a028e87caa58455fbb are bundled under the LTK Patcher License. Their upstream code signatures have been removed as required; executable sections are unchanged. Provenance and SHA-256 hashes are recorded in backend/backend-manifest.json. MadokaChanger is independent and not endorsed by League Toolkit.

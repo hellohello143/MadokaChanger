@@ -118,5 +118,9 @@ public sealed class LibraryStore(StateStore state)
         ActiveDirectory=directory; Manifest=manifest;
     }
     public IReadOnlyList<PackageRecord> Find(Selection selection) => Manifest?.Packages.Where(p=>p.Selection==selection).ToList() ?? [];
-    public string GetPackagePath(PackageRecord p) => ArchiveSafety.SafeDestination(ActiveDirectory ?? throw new InvalidOperationException("Install the skin library first."),p.Path);
+    public string GetPackagePath(PackageRecord p)
+    {
+        var current=Manifest?.Packages.SingleOrDefault(x=>x.Path==p.Path) ?? p;
+        return ArchiveSafety.SafeDestination(ActiveDirectory ?? throw new InvalidOperationException("Install the skin library first."),current.StoragePath ?? current.Path);
+    }
 }
