@@ -68,11 +68,7 @@ The native adapter is built from the pinned Rust sources. The publish script pre
 
 See [building and development](docs/BUILDING.md) for toolchain details and isolated verification commands, and [installer packaging](docs/INSTALLER.md) for installation and release behavior.
 
-## Validation and compatibility
 
-The release passes **59 automated tests** and off-screen WPF checks across small and large window sizes, including 125% and 150% render scales. The installer payload is checked with an isolated install/uninstall smoke test.
-
-**Live patcher attachment and in-game rendering have not been verified for this build.** Compatibility depends on the installed League patch and bundled backend. A running/scanning host is not proof that a skin rendered successfully in-game; the status bar switches to **In game · skins applied** only once League actually loads a modded archive. Errors are surfaced in the app and its local logs.
 
 ## Project notes
 
