@@ -1,5 +1,15 @@
 # App update verification
 
+## 1.2.1 published upgrade
+
+On October 20, 2026, the unchanged public **1.2.0** updater found GitHub latest **1.2.1**, reported an available update and downloaded `MadokaChanger-Setup-1.2.1.exe`. Its SHA-256 matched GitHub's asset digest: `994713d5ea3d79fb6f065b619839d77d2ac96473d44271642b84221dcd546792`.
+
+The downloaded setup upgraded an isolated installation created by the authentic 1.2.0 setup to `1.2.1+1ff6372bb5ab39262b636031e984255521c5528d`. Settings, favorites, selections and library fixtures were preserved byte for byte. The old Core DLL was unchanged. The test inspected the original UpdateCommand's check/download/launch routes; it did not execute the interactive confirmation, dependency installation or automatic reopening.
+
+Separate installer checks passed all 861 payload-file hashes, reinstall/upgrade, uninstall, untracked-data preservation and the unchanged real desktop shortcut. No application window was shown. Local logs remain ignored under `artifacts/releases/v1.2.1/update-from-1.2.0` and `smoke`.
+
+## Method
+
 The headless harness in `tools/MadokaChanger.UpdateVerify` loads the saved release's actual `MadokaChanger.Core.dll` in an isolated assembly context and calls that version's `UpdateService.CheckAsync` and `DownloadAppUpdateAsync`. It checks the parsed current and latest versions, update availability, selected setup asset and SHA-256 digest, then hashes the downloaded setup. The harness also inspects the saved UI assembly's `UpdateCommand` async closure IL and requires routes to `CheckAsync`, `DownloadAppUpdateAsync`, and `LaunchAppSetup`.
 
 Run `scripts/test-app-update.ps1` after the target release is published. Its defaults check 1.2.0 → 1.2.1; pass `-ExpectedOldVersion` and `-ExpectedNewVersion` to check other versions. It installs the old released setup and the downloaded new setup into a fresh workspace using `/VERYSILENT /SMOKETEST=1 /SKIPLTK=1 /DIR=<workspace>`. `-SeedFromPublish` copies a saved development payload instead of installing an old setup. `SMOKETEST` disables shortcut creation and uninstall registration, and the explicit directory keeps the payload in the workspace. The script checks the installed app version and required payload files, and compares settings, favorites, selections and library fixtures before and after the upgrade. A separate `-CheckOnly` mode exercises real GitHub release discovery without downloading or installing a setup.
@@ -8,7 +18,7 @@ The test does not instantiate the WPF application, invoke `UpdateCommand`, displ
 
 The public old release is v1.1.0. Its local installer SHA-256 matches GitHub's release asset digest (`7e2058c96ca9ac0053754197f6dbde6f1ff37bf4309cc3d5ed1fecb6f8ff5710`), and the verifier pins its Core DLL hash. A separate local development payload at `artifacts/duo-ready` reports v1.1.1; it was installed by copying published files and was never a public release. That copy can be tested with `-ExpectedOldVersion 1.1.1 -OldPublishDirectory artifacts/duo-ready -SeedFromPublish`. The script checks old Core hashes before and after each run.
 
-## Results
+## Original 1.2.0 results
 
 Pre-publication check-only run: **PASS**. The unmodified v1.1.0 updater reported GitHub latest v1.1.0 and no update, as expected before v1.2.0 publication. It selected the published v1.1.0 setup and its SHA-256 matched GitHub metadata. The saved UpdateCommand IL contained all three expected updater calls. No download, installer run, UI interaction, or restart occurred.
 
