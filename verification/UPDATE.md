@@ -12,4 +12,15 @@ The public old release is v1.1.0. Its local installer SHA-256 matches GitHub's r
 
 Pre-publication check-only run: **PASS**. The unmodified v1.1.0 updater reported GitHub latest v1.1.0 and no update, as expected before v1.2.0 publication. It selected the published v1.1.0 setup and its SHA-256 matched GitHub metadata. The saved UpdateCommand IL contained all three expected updater calls. No download, installer run, UI interaction, or restart occurred.
 
-Full v1.1.0-to-v1.2.0 upgrade against the public latest release: **Pending publication and run**.
+Post-publication verification on October 20, 2026:
+
+| Old version | Starting copy | Public discovery and verified download | Real installer upgrade | Settings and library fixtures |
+|---|---|---|---|---|
+| 1.1.0 | Authentic released setup, installed into the workspace | PASS: latest 1.2.0, update available | PASS: installed 1.2.0 | Preserved byte for byte |
+| 1.1.1 | Saved local development publish, copied into the workspace | PASS: latest 1.2.0, update available | PASS: installed 1.2.0 | Preserved byte for byte |
+
+Both old UI assemblies contained the expected UpdateCommand routes. Both unchanged updater assemblies downloaded `MadokaChanger-Setup-1.2.0.exe` from the real GitHub release and verified SHA-256 `bf8881e7749dd0908036b63973a067f97c212602daafe23eca0bf1f25ba87695`. The downloaded executable itself was used for each upgrade. The saved old Core DLL hashes remained unchanged.
+
+Separate installer verification passed all 861 payload-file hashes, reinstall/upgrade, uninstall, preservation of untracked data and the unchanged real desktop shortcut. The application was not launched by any installer verification.
+
+Local machine-specific logs and JSON results are excluded from Git under `artifacts/releases/v1.2.0/update-from-1.1.0`, `update-from-1.1.1` and `smoke`. These tests validate the updater services used by the button and the real installer, with the interactive confirmation, command execution, dependency installation and automatic reopening explicitly outside the headless test.
