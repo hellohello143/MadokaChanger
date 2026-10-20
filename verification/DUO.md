@@ -2,6 +2,19 @@
 
 Implementation and independent review were delegated to three `gpt-6-luna` workers for relay, desktop/LCU and WPF. Integration, overlay lifecycle changes and final checks were performed in the main session. Existing unrelated working-tree changes were preserved.
 
+## 1.2.1 champion scope and automatic restart
+
+- Release solution build: PASS with zero warnings/errors. Core suite: **193/193 PASS**, no skips with the native adapter configured.
+- LCU fixtures distinguish hover, completed local pick and ban, accepted trades, finalized ARAM assignments/bench swaps, dodge/ReadyCheck reset and the direct transition into a game.
+- Source tests verify only the locked local champion plus an exact compatible peer catalog selection enters a build. Other saved and enabled custom champion preferences are retained and ignored, including unavailable unrelated packages. Invalid saved identities cannot leak a different champion into builds or published metadata.
+- Process-based fake-host tests verify actual `stop` and replacement `start scan` commands after a solo skin commit, unchanged host counts after unrelated edits, safe deferral during a game, Waiting with no host, resumption after lock-in or a new applicable skin, and Stop winning a queued rebuild.
+- DuoVerify: PASS against the deployed relay. Its real background monitor first verifies solo Waiting, automatic start on lock-in and automatic restart after a saved change; it then exercises both clients' Duo synchronization, champion-only builds, in-game deferral, safe rebuilding and leave cleanup. League and patcher processes are test doubles.
+- Off-screen WPF verification: PASS for the existing layouts and two additional Waiting layouts at 1360×870 and 720×500, including disabled Start/enabled Stop and no binding errors. No application window was shown.
+
+These checks do not attach to a live League game or verify skin rendering. The deployed Worker is unchanged. Installer and published-update checks are recorded in [UPDATE.md](UPDATE.md).
+
+## Original 1.2.0 verification
+
 | Check | Result |
 |---|---|
 | `dotnet build MadokaChanger.sln -c Release --no-restore` | PASS, 0 warnings, 0 errors; includes DuoVerify |

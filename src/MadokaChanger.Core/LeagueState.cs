@@ -82,9 +82,8 @@ public sealed class LcuLeagueStateSource : ILeagueStateSource, IDisposable
             }
             else if (phase == "ReadyCheck")
             {
-                int? champion = null;
-                lock (sync) if (previousPhase == "ChampSelect") champion = previousChampion;
-                result = new LeagueState(true, phase, champion, false);
+                // Ready check precedes champion select. Never carry a champion across a dodge/new queue.
+                result = new LeagueState(true, phase, null, false);
             }
             else result = new LeagueState(true, phase, null, false);
 
@@ -149,12 +148,43 @@ public sealed class LcuLeagueStateSource : ILeagueStateSource, IDisposable
         if (!TryProperty(root, "localPlayerCellId", out var localCell) || !localCell.TryGetInt32(out var cellId)
             || !TryProperty(root, "myTeam", out var team) || team.ValueKind != JsonValueKind.Array) return null;
         var matches = team.EnumerateArray().Where(p => TryProperty(p, "cellId", out var cell) && cell.TryGetInt32(out var id) && id == cellId).ToArray();
-        return matches.Length == 1 ? ReadPositiveInt(matches[0], "championId") : null;
+        if (matches.Length != 1) return null;
+        var championId = ReadPositiveInt(matches[0], "championId");
+        if (championId is null) return null;
+        return HasCompletedLocalPick(root, cellId) || IsFinalizedSelection(root, championId.Value) ? championId : null;
+    }
+
+    private static bool HasCompletedLocalPick(JsonElement root, int localCellId)
+    {
+        if (!TryProperty(root, "actions", out var actions) || actions.ValueKind != JsonValueKind.Array) return false;
+        foreach (var group in actions.EnumerateArray())
+        {
+            if (group.ValueKind != JsonValueKind.Array) continue;
+            foreach (var action in group.EnumerateArray())
+            {
+                if (ReadString(action, "type") != "pick"
+                    || !TryProperty(action, "completed", out var completed) || completed.ValueKind != JsonValueKind.True
+                    || !TryProperty(action, "actorCellId", out var actor) || !actor.TryGetInt32(out var actorCellId)
+                    || actorCellId != localCellId) continue;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool IsFinalizedSelection(JsonElement root, int localChampionId)
+    {
+        if (!TryProperty(root, "timer", out var timer) || ReadString(timer, "phase") != "FINALIZATION") return false;
+        if (!TryProperty(root, "benchEnabled", out var enabled) || enabled.ValueKind != JsonValueKind.True) return true;
+        if (!TryProperty(root, "benchChampionIds", out var bench) || bench.ValueKind != JsonValueKind.Array) return false;
+        // During ARAM finalization the local team slot is the committed champion; a champion still on
+        // the bench is only an available trade candidate, not the local player's locked selection.
+        return !bench.EnumerateArray().Any(item => item.TryGetInt32(out var id) && id == localChampionId);
     }
 
     private static bool IsInGamePhase(string phase) => phase is "GameStart" or "InProgress" or "Reconnect" or "PreEndOfGame" or "EndOfGame";
     private static bool IsSafeTransition(string? previous, string current) =>
-        previous is "ChampSelect" or "ReadyCheck" or "GameStart" or "InProgress" or "Reconnect"
+        previous is "ChampSelect" or "GameStart" or "InProgress" or "Reconnect"
         && current is "GameStart" or "InProgress" or "Reconnect" or "PreEndOfGame" or "EndOfGame";
     private static LeagueState Unavailable() => new(false, "Unavailable", null, false);
 

@@ -16,7 +16,6 @@ public sealed class DuoCoordinator : IAsyncDisposable, IDisposable
     private DateTimeOffset stableSince;
     private string? attemptedHash;
     private string? preparationError;
-    private bool wasJoined,cleanupPending;
     private readonly SemaphoreSlim tickGate = new(1,1);
     private int disposed;
     public PartyService Party { get; }
@@ -50,17 +49,20 @@ public sealed class DuoCoordinator : IAsyncDisposable, IDisposable
     public async Task LeaveAsync(CancellationToken ct)
     {
         // Logical removal is immediate; physical changes still obey the game guard.
-        overlay.Update(null,null);attemptedHash=null;
+        overlay.Update(LocalState.ChampionId,null);attemptedHash=null;
         try { await Party.LeaveAsync(ct).ConfigureAwait(false); }
-        finally { LocalState=new(false,"Offline",null,false);EnsureLoop();Signal();Changed?.Invoke(); }
+        finally { EnsureLoop();Signal();Changed?.Invoke(); }
     }
+    /// <summary>Monitor the local champion in solo sessions as well as Duo. Does not start the patcher.</summary>
+    public void StartMonitoring() { EnsureLoop();Signal(); }
+    public Task RefreshLocalStateAsync(CancellationToken ct)=>TickAsync(ct);
     public void NotifyCommittedSelectionChanged() { attemptedHash=null;preparationError=null;Signal(); }
     private void OnChanged() { EnsureLoop();Signal();Changed?.Invoke(); }
     private void OnPatcherChanged(PatcherStatus _) { Signal();Changed?.Invoke(); }
     private void Signal() { if(wake.CurrentCount==0)try{wake.Release();}catch(SemaphoreFullException){} }
     private void EnsureLoop()
     {
-        lock(sync) if(!lifetime.IsCancellationRequested && (loop is null || loop.IsCompleted))loop=Task.Run(RunAsync);
+        lock(sync) if(Volatile.Read(ref disposed)==0 && !lifetime.IsCancellationRequested && (loop is null || loop.IsCompleted))loop=Task.Run(RunAsync);
     }
     private async Task RunAsync()
     {
@@ -69,14 +71,12 @@ public sealed class DuoCoordinator : IAsyncDisposable, IDisposable
         {
             while(!ct.IsCancellationRequested)
             {
-                if(Party.Membership is null && !cleanupPending)
-                    await wake.WaitAsync(ct).ConfigureAwait(false);
-                else await wake.WaitAsync(TimeSpan.FromSeconds(2),ct).ConfigureAwait(false);
+                await wake.WaitAsync(TimeSpan.FromSeconds(1),ct).ConfigureAwait(false);
                 // Coalesce committed selections and rapid room snapshots.
-                await Task.Delay(500,ct).ConfigureAwait(false);
+                await Task.Delay(250,ct).ConfigureAwait(false);
                 try { await TickAsync(ct).ConfigureAwait(false); }
                 catch(OperationCanceledException) when(ct.IsCancellationRequested) { break; }
-                catch(Exception e) { Status="Duo preparation failed: "+e.Message;Changed?.Invoke(); }
+                catch(Exception e) { Status="Skin preparation failed: "+e.Message;Changed?.Invoke(); }
             }
         }
         catch(OperationCanceledException) when(ct.IsCancellationRequested) { }
@@ -90,49 +90,46 @@ public sealed class DuoCoordinator : IAsyncDisposable, IDisposable
     private async Task TickCoreAsync(CancellationToken ct)
     {
         var joined=Party.Membership is not null;
-        if(joined)wasJoined=true;
-        else if(wasJoined){cleanupPending=true;wasJoined=false;}
-        if(joined)
-        {
-            try { LocalState=await league.ReadAsync(store.State.Settings.GameFolder,ct).ConfigureAwait(false); }
-            catch(Exception e) when(e is not OperationCanceledException) { LocalState=new(false,"Offline",null,false);Status="League client unavailable: "+e.Message; }
-        }
-        else LocalState=new(false,"Offline",null,false);
+        try { LocalState=await league.ReadAsync(store.State.Settings.GameFolder,ct).ConfigureAwait(false); }
+        catch(Exception e) when(e is not OperationCanceledException) { LocalState=new(false,"Offline",null,false);Status="League client unavailable: "+e.Message; }
         var peer=joined && Peer is { } candidate && DateTimeOffset.UtcNow-candidate.LastSeen<TimeSpan.FromSeconds(35) ? candidate.State : null;
-        overlay.Update(joined?LocalState.ChampionId:null,peer);
+        overlay.Update(LocalState.ChampionId,peer);
         var desiredHash=patcher.ConfigurationHash();
         if(observedHash!=desiredHash) { observedHash=desiredHash;stableSince=DateTimeOffset.UtcNow;attemptedHash=null;preparationError=null; }
-        var pending=patcher.ActiveConfiguration is not null && patcher.ActiveConfiguration!=desiredHash;
-        if((joined||cleanupPending) && pending && !LocalState.IsInGame && !patcher.IsGameOpen && DateTimeOffset.UtcNow-stableSince>=TimeSpan.FromMilliseconds(500) && attemptedHash!=desiredHash)
+        var pending=patcher.IsActive && patcher.ActiveConfiguration!=desiredHash;
+        if(pending && !LocalState.IsInGame && !patcher.IsGameOpen && DateTimeOffset.UtcNow-stableSince>=TimeSpan.FromMilliseconds(500) && attemptedHash!=desiredHash)
         {
-            attemptedHash=desiredHash;Status="Preparing matching local overrides…";Changed?.Invoke();
-            try { await patcher.RebuildIfSafeAsync(ct).ConfigureAwait(false); }
-            catch(Exception e) when(e is not OperationCanceledException) { preparationError="Duo rebuild failed: "+e.Message; }
-            pending=patcher.ActiveConfiguration is not null && patcher.ActiveConfiguration!=patcher.ConfigurationHash();
+            attemptedHash=desiredHash;Status="Preparing current champion overrides…";Changed?.Invoke();
+            try { if(!await patcher.RebuildIfSafeAsync(ct).ConfigureAwait(false))attemptedHash=null; }
+            catch(Exception e) when(e is not OperationCanceledException) { preparationError="Automatic rebuild failed: "+e.Message; }
+            pending=patcher.IsActive && patcher.ActiveConfiguration!=patcher.ConfigurationHash();
         }
-        if(!joined && !pending)cleanupPending=false;
         Selection? desired=null,prepared=null;
         var champion=LocalState.ChampionId;
         if(champion is { } id)
         {
             lock(store.State.Selections) store.State.Selections.TryGetValue(id,out desired);
             patcher.PreparedSelections.TryGetValue(id,out prepared);
+            if(desired?.ChampionId!=id)desired=null;
+            if(prepared?.ChampionId!=id)prepared=null;
         }
         var unsupported=champion is { } ch && store.State.CustomSkins.Any(c=>c.Enabled && c.ChampionId==ch);
-        var unavailable=unsupported || desired is not null && library.Find(desired).Count!=1;
-        var preparation=patcher.Status.State==PatcherState.Error || preparationError is not null?"error":unavailable || overlay.Problem is not null || joined && !LocalState.Available?"unavailable":
+        var unavailable=joined && unsupported || desired is not null && library.Find(desired).Count!=1;
+        var preparation=patcher.Status.State==PatcherState.Error || preparationError is not null?"error":unavailable || overlay.Problem is not null || !LocalState.Available?"unavailable":
             patcher.Status.State is PatcherState.Building or PatcherState.Starting?"preparing":pending?"pending":
-            patcher.ActiveConfiguration is null?"stopped":"prepared";
+            patcher.Status.State!=PatcherState.Running?"stopped":"prepared";
         LocalSelection=new(champion,unsupported?null:desired,prepared,LocalState.Phase,preparation,library.Manifest?.Commit,library.Manifest?.MetadataPatch);
-        Status=preparationError??overlay.Problem??(joined && !LocalState.Available?"League client unavailable · open League and log in to detect your champion.":unsupported?"Imported custom packages cannot be synchronized. Choose an installed catalog selection.":
+        Status=preparationError??overlay.Problem??(!LocalState.Available?"League client unavailable · open League and log in to detect your locked-in champion.":joined && unsupported?"Imported custom packages cannot be synchronized. Choose an installed catalog selection.":
             unavailable?"Your exact saved package is unavailable. Install it before preparing.":
+            patcher.Status.State==PatcherState.Waiting?patcher.Status.Message:
+            champion is null?"Waiting for your champion to be locked in. Other saved champions are not patched.":
             preparation switch
             {
-                "pending"=>"Pending for next game · the current game cannot be changed. Rebuild will run when League closes.",
-                "prepared"=>"Synchronized configuration prepared · in-game appearance requires successful patcher application.",
-                "preparing"=>"Preparing matching local overrides…",
+                "pending"=>"Skin changes pending · the patcher restarts automatically when League is closed.",
+                "prepared"=>"Current champion configuration prepared · in-game appearance requires successful patcher application.",
+                "preparing"=>"Preparing current champion overrides…",
                 "error"=>patcher.Status.Message,
-                _=>joined?"Selections synchronized · press Start to prepare the overlay.":"Party left · saved preferences preserved."
+                _=>"Current champion detected · press Start to prepare its saved skin."
             });
         if(joined)
         {

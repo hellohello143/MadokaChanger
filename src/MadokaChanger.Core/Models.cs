@@ -38,7 +38,7 @@ public sealed record LibraryPointer(string Directory, string Commit);
 public sealed record CustomSkin(string Id, int ChampionId, string Name, string Author, string Version, string Description,
     string Sha256, string FileName, string ProjectPath, List<string> Overrides, bool Enabled = false);
 public enum ConflictChoice { Reject, PreferRepository, PreferCustom }
-public enum PatcherState { Unavailable, Stopped, Building, Starting, Running, Error }
+public enum PatcherState { Unavailable, Stopped, Building, Starting, Running, Error, Waiting }
 public sealed record PatcherStatus(PatcherState State, string Message);
 public sealed record TransferProgress(string Phase, int Completed, int Total, long Bytes, long TotalBytes, int Retries = 0)
 {

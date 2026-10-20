@@ -141,7 +141,14 @@ public sealed partial class MainViewModel : ObservableObject
     public string UpdateLabel=>updateReport is { } r && (r.AppUpdateAvailable||r.LtkActionNeeded)?"↻  Update available":library.Manifest is null?"↓  Install Skin Library":"↻  Update";
     public string AppVersionText=>$"Independent fan project · v{UpdateService.CurrentVersion.ToString(3)}";
     public bool BackendReady=>native.BackendAvailable;
-    public string PatcherLabel=>patcher.Status.State==PatcherState.Stopped&&!BackendReady?"Unavailable":patcher.Status.State.ToString();
+    public string PatcherLabel=>patcher.Status.State switch
+    {
+        PatcherState.Unavailable => "Unavailable",
+        PatcherState.Waiting when !Duo.HasLockedChampion => "Waiting for champion lock-in",
+        PatcherState.Waiting => "Waiting for a supported skin for the locked champion",
+        PatcherState.Stopped when !BackendReady => "Unavailable",
+        _ => patcher.Status.State.ToString()
+    };
     public string PatcherDetail=>patcher.Status.Message;
     public string GameStatus=>GameLocator.Validate(Store.State.Settings.GameFolder)?"League installation found":"League folder needed";
     public string DependencyStatus=>(updateReport?.Summary??$"MadokaChanger v{UpdateService.CurrentVersion.ToString(3)} · press Update to check for new versions\nLTK Manager {LtkInstall.Detect().Display}")+
@@ -179,14 +186,18 @@ public sealed partial class MainViewModel : ObservableObject
     {
         get
         {
+            if(patcher.Status.State==PatcherState.Waiting)
+                return !Duo.HasLockedChampion
+                    ? "Waiting for your local champion to lock in · only that champion's saved skin is applied"
+                    : "Waiting for a saved skin for your locked-in champion · Stop cancels automatic patching";
             if(Duo.HasParty)
             {
                 if(Duo.PreparationState is "unavailable" or "error")return Duo.LocalStatus;
-                if(patcher.ActiveConfiguration is null)return "Duo party active · selections will be prepared on Start";
+                if(patcher.ActiveConfiguration is null)return "Duo party active · press Start to prepare the locked champion's selection";
                 if(patcher.ActiveConfiguration==patcher.ConfigurationHash())return "Active configuration matches Duo selections";
                 return Duo.PreparationState=="pending"?"Duo changes pending · rebuild automatically when League closes":"Duo changes preparing · rebuild automatically when safe";
             }
-            return patcher.ActiveConfiguration is null?"Patcher stopped · saved changes take effect on Start":patcher.ActiveConfiguration==patcher.ConfigurationHash()?"Active configuration matches saved selections":"◆ Pending changes · Stop, then Start to rebuild";
+            return patcher.ActiveConfiguration is null?"Patcher stopped · saved changes take effect on Start":patcher.ActiveConfiguration==patcher.ConfigurationHash()?"Active configuration matches the locked champion's saved selection":Duo.PreparationState=="pending"?"Committed changes pending · rebuild automatically when League closes":"Committed changes preparing · rebuild automatically when safe";
         }
     }
     public string SelectedCustomDetails=>SelectedCustom is { } c?$"{c.Name}\n{c.Model.Description}\n\n{c.Model.FileName}\n{c.Model.Overrides.Count:N0} file overrides · SHA-256 {c.Model.Sha256}\n\n{c.Status}":"Select an imported skin to inspect its package and conflicts.";
@@ -195,7 +206,7 @@ public sealed partial class MainViewModel : ObservableObject
     public MainViewModel(StateStore store,MetadataProvider metadata,LibraryStore library,LibraryInstaller installer,CustomSkinService custom,PatcherController patcher,NativeBridge native,AppPaths paths,UpdateService updates,LeagueClientApi leagueClient,DuoViewModel duo,ILogger<MainViewModel> log)
     {
         Store=store;this.metadata=metadata;this.library=library;this.installer=installer;this.custom=custom;this.patcher=patcher;this.native=native;this.paths=paths;this.updates=updates;this.leagueClient=leagueClient;Duo=duo;this.log=log;
-        Duo.PropertyChanged+=(_,_)=>OnPropertyChanged(nameof(ActiveText));
+        Duo.PropertyChanged+=(_,_)=>{OnPropertyChanged(nameof(ActiveText));OnPropertyChanged(nameof(PatcherLabel));};
         patcher.StatusChanged+=s=>Application.Current.Dispatcher.InvokeAsync(()=> { OnPropertyChanged(nameof(PatcherLabel));OnPropertyChanged(nameof(PatcherDetail));NotifyActions();OnPropertyChanged(nameof(ActiveText)); });
     }
     public async Task InitializeAsync()
@@ -215,6 +226,7 @@ public sealed partial class MainViewModel : ObservableObject
                 log.LogInformation("{Migration}",migrated);
             NotifyLibrary();
         });
+        Duo.StartMonitoring();
         OnPropertyChanged(nameof(DependencyStatus)); OnPropertyChanged(nameof(GameStatus));
         _=CheckUpdatesQuietlyAsync();
     }
@@ -424,6 +436,7 @@ public sealed partial class MainViewModel : ObservableObject
     }
     [RelayCommand(CanExecute=nameof(CanStart))] private async Task StartAsync()=>await RunAsync(async ct=>
     {
+        await Duo.RefreshLocalStateAsync(ct);
         await patcher.StartAsync(new Progress<string>(p=>Activity=p),ct);Message=patcher.Status.Message;OnPropertyChanged(nameof(ActiveText));
     });
     [RelayCommand(CanExecute=nameof(CanStop))] private async Task StopAsync()

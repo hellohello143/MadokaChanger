@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.1
+
+- Detects the champion you have locked in through the League client, including accepted trades and finalized ARAM swaps. Hovered picks and unrelated saved champions are excluded from patch preparation.
+- Builds only that champion's saved catalog skin and applicable local custom packages, plus an exact supported Duo partner selection. Other champion preferences are retained.
+- Start can wait for lock-in without launching a patcher host. A committed skin change automatically stops and rebuilds an active session, including solo sessions; changes during a game wait until it closes.
+- Stop cancels waiting and automatic restart intent. Resetting the last applicable override returns an armed session to waiting.
+
 ## 1.2.0
 
 - Added Duo Mode: private two-person parties with four-digit codes, local League champion detection and supported skin/chroma/form selection synchronization. The deployed HTTPS relay is included by default.

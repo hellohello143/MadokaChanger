@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -30,6 +31,7 @@ internal static class Program
                 var library=services.GetRequiredService<LibraryStore>();await library.LoadAsync();
                 var originalIdentity=library.Manifest?.Packages.OrderBy(p=>p.Path,StringComparer.Ordinal).Select(p=>new{p.Path,p.Name,p.Author,p.Version,p.Selection,p.Preview}).ToList();
                 var vm=services.GetRequiredService<MainViewModel>();await vm.InitializeAsync();
+                if(vm.Duo.LocalPhase!="Offline")throw new Exception("Headless UI verification must not start local LCU monitoring.");
                 if(originalIdentity is not null)
                 {
                     if(library.Manifest is null || !PackageTransformer.IsCurrent(library.Manifest))throw new Exception("Startup did not complete the versioned library storage migration: "+vm.Message);
@@ -76,8 +78,9 @@ internal static class Program
                         CheckVisible("DuoCreate");CheckVisible("DuoJoinCode");CheckVisible("DuoConnectionStatus",12,30);
                         var joinCode=FindControl(content,"DuoJoinCode") as System.Windows.Controls.TextBox??throw new Exception("Missing party code input.");
                         if(joinCode.MaxLength!=4 || System.Windows.Automation.AutomationProperties.GetName(joinCode)!="Four digit party code")throw new Exception("Duo join code must be a four character accessible input.");
-                        foreach(var id in new[]{"DuoRelayHelp","DuoLocalChampion","DuoLocalDesired","DuoLocalPrepared","DuoPeerChampion","DuoPeerDesired","DuoPeerPrepared"})
+                        foreach(var id in new[]{"DuoRelayHelp","DuoLocalChampion","DuoLocalDesired","DuoLocalPrepared","DuoLocalPreparation","DuoPeerChampion","DuoPeerDesired","DuoPeerPrepared"})
                             if(FindControl(content,id) is null)throw new Exception("Missing Duo state control: "+id);
+                        if(vm.Duo.LocalChampion!="League client unavailable")throw new Exception("Headless Duo verification unexpectedly read local League state.");
                         if(width>=1000){CheckVisible("DuoLocalChampion",16);CheckVisible("DuoPeerChampion",16);}
                     }
                     var mascot=FindControl(content,"BrandMascot") as System.Windows.Controls.Image??throw new Exception("Missing mascot image.");
@@ -121,8 +124,23 @@ internal static class Program
                         selections!=string.Join('|',vm.Store.State.Selections.Values.OrderBy(s=>s.ChampionId).Select(s=>s.Key)) || favorites!=string.Join('|',vm.Store.State.Favorites.Order()))
                         throw new Exception("Changing the theme changed collection state.");
                 }
+                async Task RenderWaitingState()
+                {
+                    var patcher=services.GetRequiredService<PatcherController>();
+                    var set=typeof(PatcherController).GetMethod("Set",BindingFlags.Instance|BindingFlags.NonPublic)
+                        ??throw new Exception("Patcher status test hook was not found.");
+                    set.Invoke(patcher,[PatcherState.Waiting,"Waiting for a locked-in champion with a saved skin · Stop cancels automatic patching"]);
+                    await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                    if(vm.PatcherLabel!="Waiting for champion lock-in" || !vm.ActiveText.Contains("Waiting for your local champion to lock in",StringComparison.Ordinal))
+                        throw new Exception("Waiting state must explain champion lock-in and automatic start.");
+                    if(vm.StartCommand.CanExecute(null) || !vm.StopCommand.CanExecute(null))
+                        throw new Exception("Start must be disabled and Stop enabled while waiting.");
+                    await Render("22-waiting-large");await Render("23-waiting-small",720,500,1.5);
+                    await patcher.StopAsync();await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                }
                 await Render("01-champions");
                 vm.Page="Duo";await Render("18-duo-madoka",1360,870);await Render("19-duo-madoka-small",720,500,1.5);
+                await RenderWaitingState();
                 await ToggleTheme();await Render("20-duo-homura",1360,870);await Render("21-duo-homura-small",720,500,1.5);await ToggleTheme();vm.Page="Skins";
                 await ToggleTheme();await Render("14-other-theme-browser");await ToggleTheme();
                 vm.Search="aHrI";if(vm.ChampionRows.Sum(r=>r.Champions.Count)!=1)throw new Exception("Champion search must return exactly one Ahri, without Classic duplicates");

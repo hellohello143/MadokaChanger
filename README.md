@@ -34,7 +34,7 @@
 ## Install
 
 1. Open the [latest release](https://github.com/hellohello143/MadokaChanger/releases/latest).
-2. Download **MadokaChanger-Setup-1.2.0.exe** and run it.
+2. Download **MadokaChanger-Setup-1.2.1.exe** and run it.
 3. Choose the installation folder and whether to create a desktop shortcut.
 4. Launch **MadokaChanger** from the desktop or Start menu.
 
@@ -48,10 +48,10 @@ The release also includes the existing **MadokaChanger-Uninstaller.exe** for cle
 
 1. **Find League.** Open Settings and detect or choose the League `Game` folder, then save.
 2. **Install the skin library.** This downloads the supported package collection. It requires an Internet connection and enough disk space for the library and update staging.
-3. **Choose your look.** Search for a champion, select a skin, use the color circles for chromas or choose an available special form, then click **Apply Selection**.
-4. **Start a session.** Close any running League game, click **Start**, and launch League normally. Click **Stop** when finished.
+3. **Choose your look.** Search for a champion, select a skin, use the color circles for chromas or choose an available special form, then click **Apply Selection**. Your saved choice is used when that champion is locked in.
+4. **Start a session.** Close any running League game and click **Start**. If no champion is locked in yet, MadokaChanger waits without launching the patcher host, then starts it automatically when a supported configuration is ready. Click **Stop** to cancel the session.
 
-Preview-only variants cannot be applied. Selections saved during a session take effect after **Stop → Start**. While Duo is joined, an already running patcher rebuilds automatically at safe points with League closed; mid-game changes stay pending. Importing and library updates are blocked while a session is active.
+Preview-only variants cannot be applied. Only the saved selection for your currently locked-in champion is applied; other champion preferences stay saved for later. Committed selections and applicable custom skin changes rebuild automatically at safe points while a patcher session is active, including outside Duo. Mid-game changes stay pending until League closes. Press **Stop** to cancel waiting or automatic rebuilds. Importing and library updates are blocked while a session is active.
 
 ## Build from source
 
@@ -63,7 +63,7 @@ cd MadokaChanger
 
 ./scripts/build-native.ps1
 ./scripts/publish.ps1
-./scripts/build-installer.ps1 -Version 1.2.0
+./scripts/build-installer.ps1 -Version 1.2.1
 ```
 
 The published app appears in `artifacts/win-x64/`; the installer and checksums appear in `artifacts/installer/`. If Inno Setup is outside its default location, pass `-CompilerPath "C:\path\to\ISCC.exe"`.

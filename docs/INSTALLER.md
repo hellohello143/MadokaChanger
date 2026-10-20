@@ -16,7 +16,7 @@ MadokaChanger uses Inno Setup 6.7.3 or later (7.x works, including a per-user in
 
 ```powershell
 ./scripts/publish.ps1
-./scripts/build-installer.ps1 -Version 1.2.0
+./scripts/build-installer.ps1 -Version 1.2.1
 ```
 
 Pass `-CompilerPath` or set `INNO_SETUP_COMPILER` when `ISCC.exe` is outside its standard location. `-PublishDirectory` and `-OutputDirectory` can override the build folders.
@@ -28,7 +28,7 @@ For a fresh release directory, use `publish.ps1 -OutputDirectory <publish-path>`
 ## Verify
 
 ```powershell
-./scripts/test-installer.ps1 -Installer ./artifacts/installer/MadokaChanger-Setup-1.2.0.exe
+./scripts/test-installer.ps1 -Installer ./artifacts/installer/MadokaChanger-Setup-1.2.1.exe
 ```
 
 Runs on Windows PowerShell 5.1 and PowerShell 7.
@@ -42,9 +42,9 @@ For old-version updater compatibility, use `scripts/test-app-update.ps1` after p
 Source belongs in Git; installers and checksums belong in Releases. Compiled dependencies are prepared by the build scripts. Local logs and diagnostic screenshots containing machine paths are excluded from Git. The README preview has no personal paths.
 
 ```powershell
-git tag -a v1.2.0 -m "MadokaChanger 1.2.0"
+git tag -a v1.2.1 -m "MadokaChanger 1.2.1"
 git push origin main --tags
-gh release create v1.2.0 ./artifacts/installer/MadokaChanger-Setup-1.2.0.exe ./artifacts/installer/MadokaChanger-Uninstaller.exe ./artifacts/installer/SHA256SUMS.txt --title "MadokaChanger 1.2.0" --notes-file ./docs/releases/v1.2.0.md --verify-tag
+gh release create v1.2.1 ./artifacts/installer/MadokaChanger-Setup-1.2.1.exe ./artifacts/installer/MadokaChanger-Uninstaller.exe ./artifacts/installer/SHA256SUMS.txt --title "MadokaChanger 1.2.1" --notes-file ./docs/releases/v1.2.1.md --verify-tag
 ```
 
 The installer is unsigned. Signing requires the distributor's own certificate. Upstream patcher signatures are removed as required by the LTK Patcher License and must not be reused for this distribution.

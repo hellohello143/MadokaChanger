@@ -129,6 +129,7 @@ public sealed class SystemGameEnvironment : IGameEnvironment { public bool IsOpe
 
 public sealed class PatcherController(NativeBridge native,StateStore state,LibraryStore library,AppPaths paths,OperationGate gate,ILogger<PatcherController> log,IGameEnvironment gameEnvironment,DuoOverlay? duo=null)
 {
+    private readonly DuoOverlay selectionOverlay=duo??new(library);
     public event Action<PatcherStatus>? StatusChanged;
     public PatcherStatus Status { get; private set; } = new(PatcherState.Stopped,"Stopped");
     public string? ActiveConfiguration { get; private set; }
@@ -145,22 +146,26 @@ public sealed class PatcherController(NativeBridge native,StateStore state,Libra
     private bool stopping;
     private PatcherBinaries? binaries;
     private readonly HashSet<string> redirected=new(StringComparer.OrdinalIgnoreCase);
-    public bool IsActive => Status.State is PatcherState.Running or PatcherState.Building or PatcherState.Starting;
+    public bool IsActive => Status.State is PatcherState.Running or PatcherState.Building or PatcherState.Starting or PatcherState.Waiting;
     public string ConfigurationHash()
     {
-        return ConfigurationHash(EffectiveSelections().Values,state.State.CustomSkins.Where(c=>c.Enabled));
+        var input=selectionOverlay.Capture(state.State);
+        return ConfigurationHash(input.Selections.Values,input.CustomSkins);
     }
     public IReadOnlyDictionary<int,Selection> EffectiveSelections()
     {
-        if(duo is not null) return duo.Merge(state.State);
-        lock(state.State.Selections) return new Dictionary<int,Selection>(state.State.Selections);
+        return selectionOverlay.Merge(state.State);
     }
     private string ConfigurationHash(IEnumerable<Selection> selections,IEnumerable<CustomSkin> custom)
     {
         var config=new { selections=selections.OrderBy(s=>s.ChampionId),custom=custom.OrderBy(c=>c.Id).Select(c=>c.Sha256),priority=state.State.ConflictChoice,library=library.Manifest?.Commit };
         return Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(config,JsonFile.Options)));
     }
-    public List<OverrideSource> Sources() => Sources(EffectiveSelections().Values,state.State.CustomSkins.Where(c=>c.Enabled));
+    public List<OverrideSource> Sources()
+    {
+        var input=selectionOverlay.Capture(state.State);
+        return Sources(input.Selections.Values,input.CustomSkins);
+    }
     private List<OverrideSource> Sources(IEnumerable<Selection> selections,IEnumerable<CustomSkin> custom)
     {
         var result=new List<OverrideSource>();
@@ -191,7 +196,7 @@ public sealed class PatcherController(NativeBridge native,StateStore state,Libra
         await lifecycle.WaitAsync(ct);
         try
         {
-            if(expectedStop!=Interlocked.Read(ref stopRevision) || Status.State!=PatcherState.Running || host is null || gameEnvironment.IsOpen || ActiveConfiguration==ConfigurationHash()) return false;
+            if(expectedStop!=Interlocked.Read(ref stopRevision) || Status.State is not (PatcherState.Running or PatcherState.Waiting) || gameEnvironment.IsOpen || ActiveConfiguration==ConfigurationHash()) return false;
             // Validate before stopping a usable scanning session.
             ConflictResolver.Order(Sources(),state.State.ConflictChoice);
             await StopHostAsync(); ActiveConfiguration=null; PreparedSelections=new Dictionary<int,Selection>();
@@ -218,12 +223,14 @@ public sealed class PatcherController(NativeBridge native,StateStore state,Libra
             if(!GameLocator.Validate(game)) throw new DirectoryNotFoundException("Choose a League Game folder containing League of Legends.exe and DATA/FINAL.");
             if(gameEnvironment.IsOpen) throw new InvalidOperationException("Close the League game before building a new overlay.");
             lease??=await gate.EnterAsync(ct); stopping=false;
-            var selections=EffectiveSelections(); var customSkins=state.State.CustomSkins.Where(c=>c.Enabled).ToArray();
+            var (selections,customSkins)=selectionOverlay.Capture(state.State);
             var config=ConfigurationHash(selections.Values,customSkins); var sources=ConflictResolver.Order(Sources(selections.Values,customSkins),state.State.ConflictChoice);
             if(sources.Count==0)
             {
-                if(!rebuilding) throw new InvalidOperationException("Apply a skin selection or enable a custom skin before starting.");
-                lease?.Dispose();lease=null;Set(PatcherState.Stopped,"No overrides remain after Duo cleanup. Start when you choose another skin.");return;
+                ct.ThrowIfCancellationRequested();
+                if(expectedStop is { } beforeWaiting && beforeWaiting!=Interlocked.Read(ref stopRevision))throw new OperationCanceledException("Patcher stopped before waiting.");
+                ActiveConfiguration=config;PreparedSelections=new Dictionary<int,Selection>();
+                Set(PatcherState.Waiting,"Waiting for a locked-in champion with a saved skin · Stop cancels automatic patching");return;
             }
             Set(PatcherState.Building,"Preparing selected packages");
             var session=Path.Combine(paths.Overlay,Guid.NewGuid().ToString("N")); Directory.CreateDirectory(session);
@@ -245,7 +252,7 @@ public sealed class PatcherController(NativeBridge native,StateStore state,Libra
             using(var result=await native.InvokeAsync(new{operation="build",game,overlay,state=Path.Combine(session,"state"),mods},ct,progress))
                 log.LogInformation("Built overlay: {Result}",result.RootElement.ToString());
             ct.ThrowIfCancellationRequested();
-            if(expectedStop is { } revision && revision!=Interlocked.Read(ref stopRevision))throw new OperationCanceledException("Patcher stopped during Duo preparation.");
+            if(expectedStop is { } revision && revision!=Interlocked.Read(ref stopRevision))throw new OperationCanceledException("Patcher stopped during preparation.");
             if(gameEnvironment.IsOpen) throw new InvalidOperationException("League opened during preparation. Changes are pending; close the game and Start again.");
             Set(PatcherState.Starting,"Waiting for the LTK host to confirm scanning");
             var started=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

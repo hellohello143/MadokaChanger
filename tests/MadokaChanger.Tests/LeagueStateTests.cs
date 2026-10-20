@@ -14,7 +14,7 @@ public sealed class LeagueStateTests
         var handler = new FakeLcuHandler(path => path switch
         {
             "/lol-gameflow/v1/gameflow-phase" => Quote(phase),
-            "/lol-champ-select/v1/session" => """{"localPlayerCellId":4,"myTeam":[{"cellId":1,"championId":22},{"cellId":4,"championId":103}]}""",
+            "/lol-champ-select/v1/session" => """{"localPlayerCellId":4,"myTeam":[{"cellId":1,"championId":22},{"cellId":4,"championId":103}],"actions":[[{"actorCellId":1,"championId":22,"completed":true,"type":"pick"}],[{"actorCellId":4,"championId":103,"completed":true,"type":"pick"}]]}""",
             "/lol-summoner/v1/current-summoner" => """{"internalName":"local player","summonerId":123,"displayName":"Local Player"}""",
             "/lol-gameflow/v1/session" => phase == "GameStart"
                 ? """{"gameData":{"playerChampionSelections":[{"summonerInternalName":"other","championId":22}]}}"""
@@ -28,9 +28,6 @@ public sealed class LeagueStateTests
         {
             var select = await source.ReadAsync(folder, CancellationToken.None);
             Assert.Equal(new LeagueState(true, "ChampSelect", 103, false), select);
-
-            phase = "ReadyCheck";
-            Assert.Equal(new LeagueState(true, "ReadyCheck", 103, false), await source.ReadAsync(folder, CancellationToken.None));
 
             phase = "GameStart";
             Assert.Equal(new LeagueState(true, "GameStart", 103, true), await source.ReadAsync(folder, CancellationToken.None));
@@ -70,7 +67,7 @@ public sealed class LeagueStateTests
             return path switch
             {
                 "/lol-gameflow/v1/gameflow-phase" => Quote("ChampSelect"),
-                "/lol-champ-select/v1/session" => """{"localPlayerCellId":7,"myTeam":[{"cellId":7,"championId":22}]}""",
+            "/lol-champ-select/v1/session" => """{"localPlayerCellId":7,"myTeam":[{"cellId":7,"championId":22}],"actions":[[{"actorCellId":7,"championId":22,"completed":true,"type":"pick"}]]}""",
                 _ => "{}"
             };
         });
@@ -92,7 +89,7 @@ public sealed class LeagueStateTests
         var handler = new HttpResponseHandler(path => path switch
         {
             "/lol-gameflow/v1/gameflow-phase" => Json(HttpStatusCode.OK, Quote(phase)),
-            "/lol-champ-select/v1/session" => Json(HttpStatusCode.OK, """{"localPlayerCellId":4,"myTeam":[{"cellId":4,"championId":103}]}"""),
+            "/lol-champ-select/v1/session" => Json(HttpStatusCode.OK, """{"localPlayerCellId":4,"myTeam":[{"cellId":4,"championId":103}],"actions":[[{"actorCellId":4,"championId":103,"completed":true,"type":"pick"}]]}"""),
             "/lol-summoner/v1/current-summoner" when phase == "GameStart" => Json(HttpStatusCode.NotFound, "{}"),
             _ => Json(HttpStatusCode.OK, "{}")
         });
@@ -115,7 +112,7 @@ public sealed class LeagueStateTests
         var handler = new HttpResponseHandler(path => path switch
         {
             "/lol-gameflow/v1/gameflow-phase" => Json(HttpStatusCode.OK, ++phaseReads == 2 ? "{}" : Quote(phaseReads <= 1 ? "ChampSelect" : "GameStart")),
-            "/lol-champ-select/v1/session" => Json(HttpStatusCode.OK, """{"localPlayerCellId":4,"myTeam":[{"cellId":4,"championId":103}]}"""),
+            "/lol-champ-select/v1/session" => Json(HttpStatusCode.OK, """{"localPlayerCellId":4,"myTeam":[{"cellId":4,"championId":103}],"actions":[[{"actorCellId":4,"championId":103,"completed":true,"type":"pick"}]]}"""),
             "/lol-summoner/v1/current-summoner" => Json(HttpStatusCode.OK, """{"internalName":"local"}"""),
             "/lol-gameflow/v1/session" => Json(HttpStatusCode.OK, """{"gameData":{"playerChampionSelections":[]}}"""),
             _ => Json(HttpStatusCode.OK, "{}")
@@ -130,6 +127,100 @@ public sealed class LeagueStateTests
             Assert.Equal(new LeagueState(true, "GameStart", null, true), await source.ReadAsync(folder, CancellationToken.None));
         }
         finally { Directory.Delete(folder, recursive: true); }
+    }
+
+    [Fact]
+    public async Task ChampSelectHoverAndBanAreIgnoredUntilLocalPickCompletesAndTradesFollowMyTeam()
+    {
+        var session = Session(4, 103, """{"actorCellId":4,"championId":103,"completed":false,"type":"pick"}""",
+            """{"actorCellId":4,"championId":22,"completed":true,"type":"ban"}""");
+        var handler = new HttpResponseHandler(path => path switch
+        {
+            "/lol-gameflow/v1/gameflow-phase" => Json(HttpStatusCode.OK, Quote("ChampSelect")),
+            "/lol-champ-select/v1/session" => Json(HttpStatusCode.OK, session),
+            _ => Json(HttpStatusCode.OK, "{}")
+        });
+        using var source = new LcuLeagueStateSource(new HttpClient(handler));
+        var folder = MakeGameFolder();
+        try
+        {
+            Assert.Null((await source.ReadAsync(folder, CancellationToken.None)).ChampionId);
+
+            session = Session(4, 103, """{"actorCellId":4,"championId":103,"completed":true,"type":"pick"}""");
+            Assert.Equal(103, (await source.ReadAsync(folder, CancellationToken.None)).ChampionId);
+
+            // A completed action records the original lock. The local team row is authoritative after a trade.
+            session = Session(4, 22, """{"actorCellId":4,"championId":103,"completed":true,"type":"pick"}""");
+            Assert.Equal(22, (await source.ReadAsync(folder, CancellationToken.None)).ChampionId);
+        }
+        finally { Directory.Delete(folder, recursive: true); }
+    }
+
+    [Fact]
+    public async Task ReadyCheckAndDodgeClearTheLastLockedChampionAndCannotSeedNextGame()
+    {
+        var phase = "ChampSelect";
+        var champSelect = Session(4, 103, """{"actorCellId":4,"championId":103,"completed":true,"type":"pick"}""");
+        var handler = new HttpResponseHandler(path => path switch
+        {
+            "/lol-gameflow/v1/gameflow-phase" => Json(HttpStatusCode.OK, Quote(phase)),
+            "/lol-champ-select/v1/session" => Json(HttpStatusCode.OK, champSelect),
+            "/lol-summoner/v1/current-summoner" => Json(HttpStatusCode.NotFound, "{}"),
+            "/lol-gameflow/v1/session" => Json(HttpStatusCode.NotFound, "{}"),
+            _ => Json(HttpStatusCode.OK, "{}")
+        });
+        using var source = new LcuLeagueStateSource(new HttpClient(handler));
+        var folder = MakeGameFolder();
+        try
+        {
+            Assert.Equal(103, (await source.ReadAsync(folder, CancellationToken.None)).ChampionId);
+            phase = "ReadyCheck";
+            Assert.Equal(new LeagueState(true, "ReadyCheck", null, false), await source.ReadAsync(folder, CancellationToken.None));
+            phase = "GameStart";
+            Assert.Equal(new LeagueState(true, "GameStart", null, true), await source.ReadAsync(folder, CancellationToken.None));
+
+            phase = "None"; // Dodge/end of queue.
+            Assert.Equal(new LeagueState(true, "None", null, false), await source.ReadAsync(folder, CancellationToken.None));
+            phase = "ChampSelect"; // New lobby starts with a hover and an unfinished action.
+            champSelect = Session(4, 22, """{"actorCellId":4,"championId":22,"completed":false,"type":"pick"}""");
+            Assert.Null((await source.ReadAsync(folder, CancellationToken.None)).ChampionId);
+        }
+        finally { Directory.Delete(folder, recursive: true); }
+    }
+
+    [Fact]
+    public async Task AramAutoassignmentAndBenchSwapUseOnlyFinalizedLocalSelection()
+    {
+        var session = Session(4, 103, pickAction: null, timerPhase: "BAN_PICK", benchEnabled: true, benchChampionIds: [103, 22]);
+        var handler = new HttpResponseHandler(path => path switch
+        {
+            "/lol-gameflow/v1/gameflow-phase" => Json(HttpStatusCode.OK, Quote("ChampSelect")),
+            "/lol-champ-select/v1/session" => Json(HttpStatusCode.OK, session),
+            _ => Json(HttpStatusCode.OK, "{}")
+        });
+        using var source = new LcuLeagueStateSource(new HttpClient(handler));
+        var folder = MakeGameFolder();
+        try
+        {
+            Assert.Null((await source.ReadAsync(folder, CancellationToken.None)).ChampionId);
+            session = Session(4, 103, pickAction: null, timerPhase: "FINALIZATION", benchEnabled: true, benchChampionIds: [103]);
+            Assert.Null((await source.ReadAsync(folder, CancellationToken.None)).ChampionId);
+            session = Session(4, 103, pickAction: null, timerPhase: "FINALIZATION", benchEnabled: true, benchChampionIds: [22]);
+            Assert.Equal(103, (await source.ReadAsync(folder, CancellationToken.None)).ChampionId);
+            // A bench swap changes the local slot; read that current row, not the earlier finalized value.
+            session = Session(4, 22, pickAction: null, timerPhase: "FINALIZATION", benchEnabled: true, benchChampionIds: [103]);
+            Assert.Equal(22, (await source.ReadAsync(folder, CancellationToken.None)).ChampionId);
+        }
+        finally { Directory.Delete(folder, recursive: true); }
+    }
+
+    private static string Session(int localCellId, int localChampionId, string? pickAction, string? otherAction = null,
+        string timerPhase = "BAN_PICK", bool benchEnabled = false, int[]? benchChampionIds = null)
+    {
+        var actions = new List<string>();
+        if (otherAction is not null) actions.Add("[" + otherAction + "]");
+        if (pickAction is not null) actions.Add("[" + pickAction + "]");
+        return $$"""{"localPlayerCellId":{{localCellId}},"myTeam":[{"cellId":{{localCellId}},"championId":{{localChampionId}}}],"actions":[{{string.Join(",", actions)}}],"timer":{"phase":"{{timerPhase}}"},"benchEnabled":{{benchEnabled.ToString().ToLowerInvariant()}},"benchChampionIds":{{System.Text.Json.JsonSerializer.Serialize(benchChampionIds ?? [])}}}""";
     }
 
     private static string MakeGameFolder()

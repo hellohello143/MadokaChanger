@@ -7,7 +7,7 @@ namespace MadokaChanger.Tests;
 public sealed class BackendTests : IDisposable
 {
     private readonly string root=Path.Combine(Path.GetTempPath(),"MadokaChanger-backend-tests-"+Guid.NewGuid().ToString("N"));
-    private async Task<(PatcherController Controller,OperationGate Gate,StateStore State)> CreateAsync(string mode="normal",bool gameOpen=false,string backendRelative="backend",bool leagueAdmin=false,bool appElevated=false)
+    private async Task<(PatcherController Controller,OperationGate Gate,StateStore State)> CreateAsync(string mode="normal",bool gameOpen=false,string backendRelative="backend",bool leagueAdmin=false,bool appElevated=false,bool scoped=true,int? championScope=103)
     {
         var paths=new AppPaths(root);var state=new StateStore(paths,NullLogger<StateStore>.Instance);await state.LoadAsync();
         var backend=Path.Combine(root,backendRelative);Directory.CreateDirectory(backend);
@@ -19,7 +19,8 @@ public sealed class BackendTests : IDisposable
         var library=new LibraryStore(state);var generation=Path.Combine(library.Root,"versions","fixture");Directory.CreateDirectory(generation);
         await library.ActivateAsync(generation,new("test","main",DateTimeOffset.UtcNow,"16.20",[new("fixture.fantome","sha",1,"Fixture","Author","1",103,103001,null,null,null,["a"],null)],[]),CancellationToken.None);
         var gate=new OperationGate();var native=new NativeBridge(NullLogger<NativeBridge>.Instance,fixture);
-        return(new(native,state,library,paths,gate,NullLogger<PatcherController>.Instance,new FakeGameEnvironment(gameOpen,leagueAdmin,appElevated)),gate,state);
+        var overlay=scoped?new DuoOverlay(library):null;overlay?.Update(championScope,null);
+        return(new(native,state,library,paths,gate,NullLogger<PatcherController>.Instance,new FakeGameEnvironment(gameOpen,leagueAdmin,appElevated),overlay),gate,state);
     }
     [Theory]
     [InlineData("backend")]
@@ -50,6 +51,22 @@ public sealed class BackendTests : IDisposable
         var (controller,_,state)=await CreateAsync();state.State.Settings.EnforceSkinhackScan=true;
         await controller.StartAsync(null,CancellationToken.None);await controller.StopAsync();
         Assert.Contains("config flags 0",await File.ReadAllLinesAsync(Path.Combine(root,"backend","commands.log")));
+    }
+    [Fact] public async Task Starting_an_empty_scoped_session_waits_without_a_native_host_until_stop()
+    {
+        var (controller,gate,_)=await CreateAsync(scoped:true,championScope:null);
+        await controller.StartAsync(null,CancellationToken.None);
+
+        Assert.Equal(PatcherState.Waiting,controller.Status.State);
+        Assert.True(controller.IsActive);
+        Assert.True(gate.IsBusy);
+        Assert.Equal(controller.ConfigurationHash(),controller.ActiveConfiguration);
+        Assert.False(File.Exists(Path.Combine(root,"backend","commands.log")));
+
+        await controller.StopAsync();
+        Assert.Equal(PatcherState.Stopped,controller.Status.State);
+        Assert.False(controller.IsActive);
+        Assert.False(gate.IsBusy);
     }
     [Fact] public async Task Backend_errors_cannot_be_reported_as_success_and_release_the_lease()
     {

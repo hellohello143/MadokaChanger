@@ -37,7 +37,9 @@ public sealed partial class DuoViewModel : ObservableObject, IDisposable
     public bool CanCreate => !IsBusy && HasRelay && !HasParty;
     public bool CanLeave => !IsBusy && HasParty;
     public string ConnectionStatus => coordinator.Party.IsConnected ? "Connected" : HasParty ? "Reconnecting" : "Not connected";
-    public string LocalChampion => coordinator.LocalState.Available ? ChampionLabel(coordinator.LocalState.ChampionId) : "League client unavailable";
+    public bool HasLockedChampion => coordinator.LocalState.ChampionId is not null;
+    public string LocalChampion => !coordinator.LocalState.Available ? "League client unavailable" :
+        coordinator.LocalState.ChampionId is { } championId ? ChampionLabel(championId) : "Waiting for champion lock-in";
     public string LocalPhase => coordinator.LocalState.Phase;
     public string LocalDesired => SelectionLabel(coordinator.LocalSelection.Desired);
     public string LocalPrepared => SelectionLabel(coordinator.LocalSelection.Prepared);
@@ -68,6 +70,13 @@ public sealed partial class DuoViewModel : ObservableObject, IDisposable
         catalog = value;
         NotifySnapshot();
     }
+
+    public void StartMonitoring()
+    {
+        if (!App.IsHeadlessVerification) coordinator.StartMonitoring();
+    }
+
+    public Task RefreshLocalStateAsync(CancellationToken ct) => coordinator.RefreshLocalStateAsync(ct);
 
     public void NotifyCommittedSelectionChanged() => coordinator.NotifyCommittedSelectionChanged();
 
@@ -120,7 +129,7 @@ public sealed partial class DuoViewModel : ObservableObject, IDisposable
 
     private void NotifySnapshot()
     {
-        foreach (var name in new[] { nameof(RelayUrl), nameof(HasRelay), nameof(RelayHelp), nameof(PartyStatus), nameof(HasParty), nameof(PartyCode), nameof(CanJoin), nameof(CanCreate), nameof(CanLeave), nameof(ConnectionStatus), nameof(LocalChampion), nameof(LocalPhase), nameof(LocalDesired), nameof(LocalPrepared), nameof(LocalPreparation), nameof(PreparationState), nameof(LocalStatus), nameof(PeerPresence), nameof(PeerChampion), nameof(PeerPhase), nameof(PeerDesired), nameof(PeerPrepared), nameof(PeerPreparation), nameof(PeerStatus), nameof(Outcome), nameof(HasOutcome) }) OnPropertyChanged(name);
+        foreach (var name in new[] { nameof(RelayUrl), nameof(HasRelay), nameof(RelayHelp), nameof(PartyStatus), nameof(HasParty), nameof(PartyCode), nameof(CanJoin), nameof(CanCreate), nameof(CanLeave), nameof(ConnectionStatus), nameof(HasLockedChampion), nameof(LocalChampion), nameof(LocalPhase), nameof(LocalDesired), nameof(LocalPrepared), nameof(LocalPreparation), nameof(PreparationState), nameof(LocalStatus), nameof(PeerPresence), nameof(PeerChampion), nameof(PeerPhase), nameof(PeerDesired), nameof(PeerPrepared), nameof(PeerPreparation), nameof(PeerStatus), nameof(Outcome), nameof(HasOutcome) }) OnPropertyChanged(name);
         CreateCommand.NotifyCanExecuteChanged();JoinCommand.NotifyCanExecuteChanged();LeaveCommand.NotifyCanExecuteChanged();
     }
 
@@ -153,6 +162,7 @@ public sealed partial class DuoViewModel : ObservableObject, IDisposable
         "pending" => "Pending a safe patcher rebuild",
         "unavailable" => "Unavailable on this device",
         "error" => "Preparation failed",
+        "waiting" => "Waiting for a locked-in champion with a saved skin",
         "stopped" => "Patcher stopped · selection will be prepared on Start",
         _ => string.IsNullOrWhiteSpace(value) ? "Unknown" : value
     };

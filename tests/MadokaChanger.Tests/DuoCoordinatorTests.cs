@@ -15,7 +15,8 @@ public sealed class DuoCoordinatorTests
 
     private sealed class LeagueSource(LeagueState state) : ILeagueStateSource
     {
-        public Task<LeagueState> ReadAsync(string? gameFolder, CancellationToken ct) => Task.FromResult(state);
+        public LeagueState State { get; set; } = state;
+        public Task<LeagueState> ReadAsync(string? gameFolder, CancellationToken ct) => Task.FromResult(State);
     }
 
     private sealed class Fixture : IAsyncDisposable
@@ -28,6 +29,7 @@ public sealed class DuoCoordinatorTests
         public required GameEnvironment Game { get; init; }
         public required OperationGate Gate { get; init; }
         public required FakeTransport Transport { get; init; }
+        public required LeagueSource League { get; init; }
         public required PartyService Party { get; init; }
         public required DuoCoordinator Coordinator { get; init; }
 
@@ -39,7 +41,8 @@ public sealed class DuoCoordinatorTests
         }
     }
 
-    private static async Task<Fixture> CreateFixtureAsync(bool startPatcher = false, bool gameOpen = false)
+    private static async Task<Fixture> CreateFixtureAsync(bool startPatcher = false, bool gameOpen = false,
+        bool includeParty = true, int? champion = 103)
     {
         var root = Path.Combine(Path.GetTempPath(), "Madoka-duo-coordinator-" + Guid.NewGuid().ToString("N"));
         var paths = new AppPaths(root);
@@ -75,6 +78,7 @@ public sealed class DuoCoordinatorTests
         state.State.Settings.GameFolder = gameFolder;
 
         var overlay = new DuoOverlay(library);
+        overlay.Update(champion, null);
         var game = new GameEnvironment { IsOpen = gameOpen };
         var gate = new OperationGate();
         var patcher = new PatcherController(new(NullLogger<NativeBridge>.Instance, executable), state, library,
@@ -82,14 +86,15 @@ public sealed class DuoCoordinatorTests
         var transport = new FakeTransport();
         transport.AddPeer(PeerState());
         var party = new PartyService(transport, pollInterval: TimeSpan.FromHours(1));
-        await party.CreateAsync(CancellationToken.None);
-        var coordinator = new DuoCoordinator(party, new LeagueSource(new(true, "ChampSelect", 103, false)),
+        if (includeParty) await party.CreateAsync(CancellationToken.None);
+        var league = new LeagueSource(new(true, "ChampSelect", champion, false));
+        var coordinator = new DuoCoordinator(party, league,
             state, library, patcher, overlay, "https://relay.example");
         if (startPatcher) await patcher.StartAsync(null, CancellationToken.None);
         return new Fixture
         {
             Root = root, State = state, Library = library, Overlay = overlay, Patcher = patcher,
-            Game = game, Gate = gate, Transport = transport, Party = party, Coordinator = coordinator
+            Game = game, Gate = gate, Transport = transport, League = league, Party = party, Coordinator = coordinator
         };
     }
 
@@ -106,7 +111,7 @@ public sealed class DuoCoordinatorTests
 
         Assert.Equal("pending", fixture.Coordinator.Preparation);
         Assert.Equal(initialConfiguration, fixture.Patcher.ActiveConfiguration);
-        Assert.Equal(new(99, 99001), fixture.Patcher.PreparedSelections[99]);
+        Assert.DoesNotContain(99, fixture.Patcher.PreparedSelections.Keys);
         Assert.Equal(new(99, 99002), fixture.Patcher.EffectiveSelections()[99]);
 
         fixture.Game.IsOpen = false;
@@ -117,8 +122,9 @@ public sealed class DuoCoordinatorTests
         fixture.Game.IsOpen = true;
         await fixture.Coordinator.LeaveAsync(CancellationToken.None);
         Assert.Null(fixture.Coordinator.Peer);
-        Assert.Equal(new(99, 99001), fixture.Patcher.EffectiveSelections()[99]);
-        Assert.Equal("Offline", fixture.Coordinator.LocalState.Phase);
+        Assert.DoesNotContain(99, fixture.Patcher.EffectiveSelections().Keys);
+        Assert.Equal(new(103, 103001), fixture.Patcher.EffectiveSelections()[103]);
+        Assert.Equal("ChampSelect", fixture.Coordinator.LocalState.Phase);
 
         fixture.Game.IsOpen = false;
         // Let the coordinator observe the transition from joined to left and
@@ -126,7 +132,8 @@ public sealed class DuoCoordinatorTests
         await fixture.Coordinator.TickAsync(CancellationToken.None);
         await Task.Delay(550);
         await fixture.Coordinator.TickAsync(CancellationToken.None);
-        Assert.Equal(new(99, 99001), fixture.Patcher.PreparedSelections[99]);
+        Assert.DoesNotContain(99, fixture.Patcher.PreparedSelections.Keys);
+        Assert.Equal(new(103, 103001), fixture.Patcher.PreparedSelections[103]);
         Assert.Equal(PatcherState.Running, fixture.Patcher.Status.State);
     }
 
@@ -147,6 +154,171 @@ public sealed class DuoCoordinatorTests
         Assert.Equal(new(103, 103002), fixture.Transport.LastPublished?.Desired);
         Assert.Equal(PatcherState.Stopped, fixture.Patcher.Status.State);
         Assert.Null(fixture.Patcher.ActiveConfiguration);
+    }
+
+    [Fact]
+    public async Task Solo_committed_skin_change_rebuilds_armed_active_session_automatically()
+    {
+        await using var fixture = await CreateFixtureAsync(startPatcher: true, includeParty: false);
+        var oldConfiguration = fixture.Patcher.ActiveConfiguration;
+        Assert.Equal(PatcherState.Running, fixture.Patcher.Status.State);
+
+        fixture.State.State.Selections[103] = new(103, 103002);
+        fixture.Coordinator.NotifyCommittedSelectionChanged();
+        await fixture.Coordinator.TickAsync(CancellationToken.None);
+        await Task.Delay(550);
+        await fixture.Coordinator.TickAsync(CancellationToken.None);
+
+        Assert.NotEqual(oldConfiguration, fixture.Patcher.ActiveConfiguration);
+        Assert.Equal(PatcherState.Running, fixture.Patcher.Status.State);
+        Assert.Equal(new(103, 103002), fixture.Patcher.PreparedSelections[103]);
+        Assert.True(fixture.Gate.IsBusy);
+        var commands = await File.ReadAllLinesAsync(Path.Combine(fixture.Root, "backend", "commands.log"));
+        Assert.Equal(2, commands.Count(command => command == "start scan"));
+        Assert.Equal(1, commands.Count(command => command == "stop"));
+    }
+
+    [Fact]
+    public async Task Unrelated_saved_champion_change_does_not_restart_locked_session()
+    {
+        await using var fixture = await CreateFixtureAsync(startPatcher: true, includeParty: false);
+        var configuration = fixture.Patcher.ActiveConfiguration;
+        fixture.State.State.Selections[99] = new(99, 99002);
+        fixture.Coordinator.NotifyCommittedSelectionChanged();
+
+        await fixture.Coordinator.TickAsync(CancellationToken.None);
+        await Task.Delay(550);
+        await fixture.Coordinator.TickAsync(CancellationToken.None);
+
+        Assert.Equal(configuration, fixture.Patcher.ActiveConfiguration);
+        Assert.Equal(new(103, 103001), fixture.Patcher.PreparedSelections[103]);
+        Assert.DoesNotContain(99, fixture.Patcher.PreparedSelections.Keys);
+        var commands = await File.ReadAllLinesAsync(Path.Combine(fixture.Root, "backend", "commands.log"));
+        Assert.Single(commands, command => command == "start scan");
+        Assert.DoesNotContain("stop", commands);
+    }
+
+    [Fact]
+    public async Task Changing_locked_champion_rebuilds_with_only_the_new_local_source()
+    {
+        await using var fixture = await CreateFixtureAsync(startPatcher: true, includeParty: false);
+        fixture.League.State = new(true, "ChampSelect", 99, false);
+
+        await fixture.Coordinator.TickAsync(CancellationToken.None);
+        await Task.Delay(550);
+        await fixture.Coordinator.TickAsync(CancellationToken.None);
+
+        Assert.Equal(99, fixture.Coordinator.LocalSelection.ChampionId);
+        Assert.Equal(new(99, 99001), fixture.Patcher.PreparedSelections[99]);
+        Assert.DoesNotContain(103, fixture.Patcher.PreparedSelections.Keys);
+        Assert.Equal(PatcherState.Running, fixture.Patcher.Status.State);
+    }
+
+    [Fact]
+    public async Task Removing_last_scoped_override_enters_waiting_and_new_override_resumes_session()
+    {
+        await using var fixture = await CreateFixtureAsync(startPatcher: true, includeParty: false);
+        fixture.State.State.Selections.Remove(103);
+        fixture.Coordinator.NotifyCommittedSelectionChanged();
+
+        await fixture.Coordinator.TickAsync(CancellationToken.None);
+        await Task.Delay(550);
+        await fixture.Coordinator.TickAsync(CancellationToken.None);
+
+        Assert.Equal(PatcherState.Waiting, fixture.Patcher.Status.State);
+        Assert.True(fixture.Patcher.IsActive);
+        Assert.True(fixture.Gate.IsBusy);
+        Assert.Equal(fixture.Patcher.ConfigurationHash(), fixture.Patcher.ActiveConfiguration);
+
+        fixture.State.State.Selections[103] = new(103, 103002);
+        fixture.Coordinator.NotifyCommittedSelectionChanged();
+        await fixture.Coordinator.TickAsync(CancellationToken.None);
+        await Task.Delay(550);
+        await fixture.Coordinator.TickAsync(CancellationToken.None);
+
+        Assert.Equal(PatcherState.Running, fixture.Patcher.Status.State);
+        Assert.Equal(new(103, 103002), fixture.Patcher.PreparedSelections[103]);
+        Assert.True(fixture.Gate.IsBusy);
+        var commands = await File.ReadAllLinesAsync(Path.Combine(fixture.Root, "backend", "commands.log"));
+        Assert.Equal(2, commands.Count(command => command == "start scan"));
+        Assert.Equal(1, commands.Count(command => command == "stop"));
+    }
+
+    [Fact]
+    public async Task Waiting_session_starts_when_the_champion_is_locked_in()
+    {
+        await using var fixture = await CreateFixtureAsync(startPatcher: true, includeParty: false, champion: null);
+        Assert.Equal(PatcherState.Waiting, fixture.Patcher.Status.State);
+        Assert.True(fixture.Gate.IsBusy);
+        Assert.False(File.Exists(Path.Combine(fixture.Root, "backend", "commands.log")));
+
+        fixture.League.State = new(true, "ChampSelect", 103, false);
+        await fixture.Coordinator.TickAsync(CancellationToken.None);
+        await Task.Delay(550);
+        await fixture.Coordinator.TickAsync(CancellationToken.None);
+
+        Assert.Equal(PatcherState.Running, fixture.Patcher.Status.State);
+        Assert.Equal(new(103, 103001), fixture.Patcher.PreparedSelections[103]);
+        Assert.Single(await File.ReadAllLinesAsync(Path.Combine(fixture.Root, "backend", "commands.log")),
+            command => command == "start scan");
+    }
+
+    [Fact]
+    public async Task Solo_selection_change_waits_for_the_game_to_close_then_rebuilds()
+    {
+        await using var fixture = await CreateFixtureAsync(startPatcher: true, includeParty: false);
+        fixture.Game.IsOpen = true;
+        var oldConfiguration = fixture.Patcher.ActiveConfiguration;
+        fixture.State.State.Selections[103] = new(103, 103002);
+        fixture.Coordinator.NotifyCommittedSelectionChanged();
+
+        await fixture.Coordinator.TickAsync(CancellationToken.None);
+        await Task.Delay(550);
+        await fixture.Coordinator.TickAsync(CancellationToken.None);
+        Assert.Equal("pending", fixture.Coordinator.Preparation);
+        Assert.Equal(oldConfiguration, fixture.Patcher.ActiveConfiguration);
+        Assert.Equal(new(103, 103001), fixture.Patcher.PreparedSelections[103]);
+        var duringGame = await File.ReadAllLinesAsync(Path.Combine(fixture.Root, "backend", "commands.log"));
+        Assert.Single(duringGame, command => command == "start scan");
+        Assert.DoesNotContain("stop", duringGame);
+
+        fixture.Game.IsOpen = false;
+        await fixture.Coordinator.TickAsync(CancellationToken.None);
+        await Task.Delay(550);
+        await fixture.Coordinator.TickAsync(CancellationToken.None);
+
+        Assert.Equal(PatcherState.Running, fixture.Patcher.Status.State);
+        Assert.Equal(new(103, 103002), fixture.Patcher.PreparedSelections[103]);
+        var afterGame = await File.ReadAllLinesAsync(Path.Combine(fixture.Root, "backend", "commands.log"));
+        Assert.Equal(2, afterGame.Count(command => command == "start scan"));
+        Assert.Equal(1, afterGame.Count(command => command == "stop"));
+    }
+
+    [Fact]
+    public async Task A_stopped_patcher_does_not_auto_start_after_a_solo_commit()
+    {
+        await using var fixture = await CreateFixtureAsync(includeParty: false);
+        fixture.State.State.Selections[103] = new(103, 103002);
+        fixture.Coordinator.NotifyCommittedSelectionChanged();
+        await fixture.Coordinator.TickAsync(CancellationToken.None);
+        await Task.Delay(550);
+        await fixture.Coordinator.TickAsync(CancellationToken.None);
+
+        Assert.Equal(PatcherState.Stopped, fixture.Patcher.Status.State);
+        Assert.Null(fixture.Patcher.ActiveConfiguration);
+        Assert.False(fixture.Gate.IsBusy);
+    }
+
+    [Fact]
+    public async Task Malformed_saved_identity_is_never_published_for_the_locked_champion()
+    {
+        await using var fixture=await CreateFixtureAsync();
+        fixture.State.State.Selections[103]=new(99,99001);
+        await fixture.Coordinator.TickAsync(CancellationToken.None);
+        Assert.Null(fixture.Coordinator.LocalSelection.Desired);
+        Assert.True(DuoProtocol.ValidState(fixture.Coordinator.LocalSelection));
+        Assert.Null(fixture.Transport.LastPublished?.Desired);
+        Assert.DoesNotContain(103,fixture.Patcher.EffectiveSelections().Keys);
     }
 
     [Fact]

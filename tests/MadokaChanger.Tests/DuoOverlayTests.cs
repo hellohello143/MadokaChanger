@@ -19,7 +19,7 @@ public sealed class DuoOverlayTests : IDisposable
         foreach(var file in Directory.EnumerateFiles(Path.Combine(AppContext.BaseDirectory,"TestBackend")))File.Copy(file,Path.Combine(backend,Path.GetFileName(file)));
         var exe=Path.Combine(backend,"MadokaChanger.TestBackend.exe");File.Copy(exe,Path.Combine(backend,"ltk_patcher_host.exe"));File.WriteAllText(Path.Combine(backend,"ltk_patcher_dll.dll"),"fixture");
         var gameDir=Path.Combine(root,"game");Directory.CreateDirectory(Path.Combine(gameDir,"DATA","FINAL"));File.WriteAllText(Path.Combine(gameDir,"League of Legends.exe"),"fixture");state.State.Settings.GameFolder=gameDir;
-        var overlay=new DuoOverlay(library);var game=new Game();var gate=new OperationGate();
+        var overlay=new DuoOverlay(library);overlay.Update(103,null);var game=new Game();var gate=new OperationGate();
         var patcher=new PatcherController(new(NullLogger<NativeBridge>.Instance,exe),state,library,paths,gate,NullLogger<PatcherController>.Instance,game,overlay);
         return(state,library,overlay,patcher,game,gate);
     }
@@ -31,7 +31,7 @@ public sealed class DuoOverlayTests : IDisposable
         var variant=new Selection(99,99003,99005,"Dark");overlay.Update(103,Peer(variant));
         Assert.Equal(variant,patcher.EffectiveSelections()[99]);Assert.Equal(new(103,103001),patcher.EffectiveSelections()[103]);
         Assert.NotEqual(original,patcher.ConfigurationHash());Assert.Equal(new(99,99001),state.State.Selections[99]);Assert.Equal(2,patcher.Sources().Count);
-        overlay.Update(null,null);Assert.Equal(original,patcher.ConfigurationHash());Assert.Equal(new(99,99001),state.State.Selections[99]);
+        overlay.Update(103,null);Assert.Equal(original,patcher.ConfigurationHash());Assert.DoesNotContain(99,patcher.EffectiveSelections().Keys);Assert.Equal(new(99,99001),state.State.Selections[99]);
     }
     [Fact] public async Task Missing_or_incompatible_peer_package_never_substitutes_saved_skin()
     {
@@ -44,7 +44,7 @@ public sealed class DuoOverlayTests : IDisposable
         var (_,_,overlay,patcher,_,_)=await FixtureAsync();
         overlay.Update(103,Peer(null));Assert.DoesNotContain(99,patcher.EffectiveSelections().Keys);
         overlay.Update(103,Peer(new(103,103002),103));Assert.Equal(new(103,103001),patcher.EffectiveSelections()[103]);Assert.Contains("Same-champion",overlay.Problem!);
-        overlay.Update(null,Peer(new(99,99002)));Assert.Equal(new(99,99001),patcher.EffectiveSelections()[99]);Assert.Contains("detected",overlay.Problem!);
+        overlay.Update(null,Peer(new(99,99002)));Assert.Empty(patcher.EffectiveSelections());Assert.Contains("locked-in",overlay.Problem!);
     }
     [Fact] public async Task Ambiguous_peer_packages_and_file_conflicts_are_not_silently_accepted()
     {
@@ -68,11 +68,45 @@ public sealed class DuoOverlayTests : IDisposable
             Assert.False(await patcher.RebuildIfSafeAsync(CancellationToken.None));Assert.Equal(active,patcher.ActiveConfiguration);Assert.Equal(new(99,99002),patcher.PreparedSelections[99]);
             game.IsOpen=false;Assert.True(await patcher.RebuildIfSafeAsync(CancellationToken.None));Assert.True(gate.IsBusy);
             Assert.Equal(patcher.ConfigurationHash(),patcher.ActiveConfiguration);Assert.Equal(new(99,99003,99005,"Dark"),patcher.PreparedSelections[99]);
-            game.IsOpen=true;overlay.Update(null,null);Assert.False(await patcher.RebuildIfSafeAsync(CancellationToken.None));
-            game.IsOpen=false;Assert.True(await patcher.RebuildIfSafeAsync(CancellationToken.None));Assert.Equal(new(99,99001),patcher.PreparedSelections[99]);
+            game.IsOpen=true;overlay.Update(103,null);Assert.False(await patcher.RebuildIfSafeAsync(CancellationToken.None));
+            game.IsOpen=false;Assert.True(await patcher.RebuildIfSafeAsync(CancellationToken.None));Assert.Equal(new(103,103001),patcher.PreparedSelections[103]);Assert.DoesNotContain(99,patcher.PreparedSelections.Keys);
         }
         finally {await patcher.StopAsync();}
         Assert.False(gate.IsBusy);
+    }
+    [Fact] public async Task Active_scope_contains_only_locked_champion_and_compatible_peer_selection()
+    {
+        var (state,_,overlay,patcher,_,_)=await FixtureAsync();
+        Assert.Equal(new(103,103001),patcher.EffectiveSelections()[103]);
+        Assert.DoesNotContain(99,patcher.EffectiveSelections().Keys);
+
+        var peer=new Selection(99,99002);
+        overlay.Update(103,Peer(peer));
+        Assert.Equal(new(103,103001),patcher.EffectiveSelections()[103]);
+        Assert.Equal(peer,patcher.EffectiveSelections()[99]);
+
+        overlay.Update(99,Peer(new(103,103002),103));
+        Assert.Equal(new(99,99001),patcher.EffectiveSelections()[99]);
+        Assert.Equal(new(103,103002),patcher.EffectiveSelections()[103]);
+        Assert.Equal(new(103,103001),state.State.Selections[103]);
+    }
+    [Fact] public async Task Unrelated_enabled_custom_package_does_not_block_peer_or_enter_sources()
+    {
+        var (state,_,overlay,patcher,_,_)=await FixtureAsync();
+        state.State.CustomSkins.Add(new("custom-peer",99,"Imported peer skin","author","1","","sha","peer.fantome",Path.Combine(root,"custom-peer"),["champion:99"],true));
+        state.State.CustomSkins.Add(new("custom-local",103,"Imported local skin","author","1","","sha","local.fantome",Path.Combine(root,"custom-local"),["champion:103"],true));
+        overlay.Update(103,Peer(new(99,99002)));
+
+        Assert.Equal(new(99,99002),patcher.EffectiveSelections()[99]);
+        Assert.Equal("Imported local skin",Assert.Single(patcher.Sources(),source=>source.IsCustom).Name);
+        Assert.Null(overlay.Problem);
+    }
+    [Fact] public async Task Malformed_saved_identity_cannot_patch_a_different_champion()
+    {
+        var (state,_,_,patcher,_,_)=await FixtureAsync();
+        state.State.Selections[103]=new(99,99001);
+        Assert.Empty(patcher.EffectiveSelections());
+        Assert.Empty(patcher.Sources());
     }
     [Fact] public async Task Stop_serializes_with_rebuild_and_leaves_no_session()
     {
