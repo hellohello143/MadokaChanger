@@ -184,6 +184,8 @@ public sealed class UpdateService(RemoteClient remote,AppPaths paths,NativeBridg
     /// Runs the per-user setup silently. /RELAUNCH=1 tells it to start MadokaChanger again when it finishes,
     /// and /SKIPLTK=1 skips its dependency step because this app just handled LTK Manager itself.
     /// </summary>
-    public static void LaunchAppSetup(string setup)=>
-        Process.Start(new ProcessStartInfo(setup,"/SILENT /SUPPRESSMSGBOXES /NORESTART /RELAUNCH=1 /SKIPLTK=1"){UseShellExecute=true})?.Dispose();
+    public static ProcessStartInfo AppSetupStartInfo(string setup)=>
+        new(setup,$"/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /RELAUNCH=1 /SKIPLTK=1 /DIR=\"{Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory)}\""){UseShellExecute=true};
+
+    public static void LaunchAppSetup(string setup)=>Process.Start(AppSetupStartInfo(setup))?.Dispose();
 }

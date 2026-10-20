@@ -16,6 +16,8 @@ Default root for a new installation: `%LOCALAPPDATA%/MadokaChanger/`. Upgrades r
 
 `LibraryFolder` can select another dedicated library root. It does not move the current generation. Keep a library directory separate from `custom`, caches, logs and patches. Metadata, images, settings, temporary files and custom imports remain under the data root.
 
+`settings.homuraTheme` remembers the sidebar character and appearance. Missing/false uses the original Madoka pink/plum palette; true uses Homura with purple accents and grey surfaces. Clicking the mascot saves this preference immediately; saving other settings retains it. Appearance changes do not alter skin metadata or stored selections.
+
 ## Update commit boundary
 
 The source adapter discovers the default branch and resolves its SHA once. Git tree requests enumerate the pinned SHA; if the recursive response is truncated, non-recursive trees are walked. Git Trees has no pagination; a truncated single-directory result is refused rather than accepted as complete. Downloads always use the resolved SHA. Git LFS pointers are verified as Git blobs before their pinned media payload is downloaded and checked against its declared SHA-256/size.

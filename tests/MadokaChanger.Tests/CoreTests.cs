@@ -105,9 +105,9 @@ public sealed class CoreTests : IDisposable
     }
     [Fact] public async Task Settings_restore_selections_favorites_and_custom_enabled_state()
     {
-        var paths=new AppPaths(root);var store=new StateStore(paths,NullLogger<StateStore>.Instance);await store.LoadAsync();store.State.Selections[103]=new(103,103001,103052,"special");store.State.Favorites.Add(103);
+        var paths=new AppPaths(root);var store=new StateStore(paths,NullLogger<StateStore>.Instance);await store.LoadAsync();store.State.Settings.HomuraTheme=true;store.State.Selections[103]=new(103,103001,103052,"special");store.State.Favorites.Add(103);
         store.State.CustomSkins.Add(new("id",103,"name","author","1","","hash","file","project",["a"],true));await store.SaveAsync();
-        var restored=new StateStore(paths,NullLogger<StateStore>.Instance);await restored.LoadAsync();Assert.Equal(store.State.Selections[103],restored.State.Selections[103]);Assert.Contains(103,restored.State.Favorites);Assert.True(restored.State.CustomSkins[0].Enabled);
+        var restored=new StateStore(paths,NullLogger<StateStore>.Instance);await restored.LoadAsync();Assert.True(restored.State.Settings.HomuraTheme);Assert.Equal(store.State.Selections[103],restored.State.Selections[103]);Assert.Contains(103,restored.State.Favorites);Assert.True(restored.State.CustomSkins[0].Enabled);
     }
     [Fact] public async Task Full_update_reinstalls_unchanged_files_and_unchanged_revision_downloads_nothing()
     {

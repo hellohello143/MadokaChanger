@@ -18,8 +18,9 @@ public sealed class AsyncImage : Grid
     public Stretch ImageStretch {get=>(Stretch)GetValue(ImageStretchProperty);set=>SetValue(ImageStretchProperty,value);}
     public AsyncImage()
     {
-        ClipToBounds=true;Background=new SolidColorBrush(Color.FromRgb(35,29,49));
-        Children.Add(new TextBlock{Text="◇",Foreground=new SolidColorBrush(Color.FromRgb(172,150,232)),Opacity=.28,FontSize=32,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center});
+        ClipToBounds=true;SetResourceReference(BackgroundProperty,"ImagePlaceholderBrush");
+        var placeholder=new TextBlock{Text="◇",Opacity=.28,FontSize=32,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
+        placeholder.SetResourceReference(TextBlock.ForegroundProperty,"VioletBrush");Children.Add(placeholder);
         Children.Add(image);Loaded+=(_,_)=>Load();Unloaded+=(_,_)=>{pending?.Cancel();};
     }
     private static void Changed(DependencyObject d,DependencyPropertyChangedEventArgs e)=>((AsyncImage)d).Load();

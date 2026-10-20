@@ -26,14 +26,15 @@
 - **A cleaner champion library.** Search by name, mark favorites and keep one saved skin/chroma/form per champion. Classic/Jade entries are excluded.
 - **A preview that stays in view.** Artwork, the skin strip, chroma color circles and Apply/Reset remain visible in smaller windows without vertical page scrolling.
 - **Your own custom skins.** Import supported `.fantome`, `.modpkg` and Fantome ZIP packages, review conflicts, and enable or uninstall imports.
-- **A dark desktop experience.** Pink and plum styling, a chibi icon, compact navigation, responsive panels and reduced-motion support.
+- **Duo Mode.** Join a private two-person party using a four-digit code and synchronize supported catalog selections. Both PCs need the same library; the shared HTTPS relay is included. [Setup, deployment and limitations](docs/DUO.md).
+- **Two dark desktop themes.** Click the smaller sidebar chibi to switch between Madoka's pink/plum theme and Homura's purple/grey theme. Your choice is remembered. Includes compact navigation, responsive panels and reduced-motion support.
 - **Recoverable library updates.** Downloads are validated and staged before activation. An interrupted update keeps the previous working library.
 - **Local storage obfuscation.** Downloaded packages use opaque filenames and package name metadata while the app retains original names and selections. This does not establish user security or encrypt package content.
 
 ## Install
 
 1. Open the [latest release](https://github.com/hellohello143/MadokaChanger/releases/latest).
-2. Download **MadokaChanger-Setup-1.1.0.exe** and run it.
+2. Download **MadokaChanger-Setup-1.2.0.exe** and run it.
 3. Choose the installation folder and whether to create a desktop shortcut.
 4. Launch **MadokaChanger** from the desktop or Start menu.
 
@@ -50,7 +51,7 @@ The release also includes the existing **MadokaChanger-Uninstaller.exe** for cle
 3. **Choose your look.** Search for a champion, select a skin, use the color circles for chromas or choose an available special form, then click **Apply Selection**.
 4. **Start a session.** Close any running League game, click **Start**, and launch League normally. Click **Stop** when finished.
 
-Preview-only variants cannot be applied. Selections saved during a session take effect after **Stop → Start**. Importing and library updates are blocked while a session is active.
+Preview-only variants cannot be applied. Selections saved during a session take effect after **Stop → Start**. While Duo is joined, an already running patcher rebuilds automatically at safe points with League closed; mid-game changes stay pending. Importing and library updates are blocked while a session is active.
 
 ## Build from source
 
@@ -62,7 +63,7 @@ cd MadokaChanger
 
 ./scripts/build-native.ps1
 ./scripts/publish.ps1
-./scripts/build-installer.ps1 -Version 1.1.0
+./scripts/build-installer.ps1 -Version 1.2.0
 ```
 
 The published app appears in `artifacts/win-x64/`; the installer and checksums appear in `artifacts/installer/`. If Inno Setup is outside its default location, pass `-CompilerPath "C:\path\to\ISCC.exe"`.

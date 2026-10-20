@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../src/MadokaChanger.Core/MadokaChanger.Core.csproj"/><ProjectReference Include="../../tests/MadokaChanger.TestBackend/MadokaChanger.TestBackend.csproj" ReferenceOutputAssembly="false"/></ItemGroup>
+  <Target Name="CopyBackendFixture" AfterTargets="Build"><ItemGroup><BackendFiles Include="../../tests/MadokaChanger.TestBackend/bin/$(Configuration)/net10.0/*"/></ItemGroup><Copy SourceFiles="@(BackendFiles)" DestinationFolder="$(OutDir)TestBackend"/></Target>
+</Project>

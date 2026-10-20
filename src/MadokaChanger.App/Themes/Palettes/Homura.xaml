@@ -1,0 +1,30 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options">
+ <SolidColorBrush x:Key="BackgroundBrush" Color="#111216"/>
+ <SolidColorBrush x:Key="PanelBrush" Color="#1C1D23"/>
+ <SolidColorBrush x:Key="RaisedBrush" Color="#292A33"/>
+ <SolidColorBrush x:Key="LineBrush" Color="#42404E"/>
+ <SolidColorBrush x:Key="AccentBrush" Color="#B8A1E8"/>
+ <SolidColorBrush x:Key="VioletBrush" Color="#9384B2"/>
+ <SolidColorBrush x:Key="TextBrush" Color="#ECECF1"/>
+ <SolidColorBrush x:Key="MutedBrush" Color="#B7B6C2"/>
+ <SolidColorBrush x:Key="GoldBrush" Color="#C8C1D5"/>
+ <SolidColorBrush x:Key="ErrorBrush" Color="#E6A2AE"/>
+ <SolidColorBrush x:Key="SidebarBrush" Color="#18191E"/>
+ <SolidColorBrush x:Key="SubtleLineBrush" Color="#30323B"/>
+ <SolidColorBrush x:Key="NavSelectionBrush" Color="#342E45"/>
+ <SolidColorBrush x:Key="DecorationBrush" Color="#7E7396"/>
+ <SolidColorBrush x:Key="FootnoteBrush" Color="#97949F"/>
+ <SolidColorBrush x:Key="StatusPanelBrush" Color="#25262E"/>
+ <SolidColorBrush x:Key="BadgeBrush" Color="#D1111216"/>
+ <SolidColorBrush x:Key="PreviewFrameBrush" Color="#D01C1D23"/>
+ <SolidColorBrush x:Key="FooterLineBrush" Color="#34363F"/>
+ <SolidColorBrush x:Key="FooterBrush" Color="#1A1B20"/>
+ <SolidColorBrush x:Key="OptionSelectionBrush" Color="#443B5B"/>
+ <SolidColorBrush x:Key="SelectionBrush" Color="#3A324C"/>
+ <SolidColorBrush x:Key="AlternateRowBrush" Color="#22232B"/>
+ <SolidColorBrush x:Key="TableSelectionBrush" Color="#443B5B"/>
+ <SolidColorBrush x:Key="ScrollThumbBrush" Color="#6B6479"/>
+ <SolidColorBrush x:Key="ImagePlaceholderBrush" Color="#23242C"/>
+ <Color x:Key="PreviewFadeColor">#EE111216</Color>
+ <DrawingBrush x:Key="MagicCircle" po:Freeze="True" Stretch="Uniform" Opacity=".10"><DrawingBrush.Drawing><DrawingGroup><GeometryDrawing Brush="Transparent"><GeometryDrawing.Pen><Pen Brush="#9384B2" Thickness="1"/></GeometryDrawing.Pen><GeometryDrawing.Geometry><GeometryGroup><EllipseGeometry Center="200,200" RadiusX="180" RadiusY="180"/><EllipseGeometry Center="200,200" RadiusX="160" RadiusY="160"/><EllipseGeometry Center="200,200" RadiusX="120" RadiusY="120"/><PathGeometry Figures="M 200,20 L 356,290 L 44,290 Z M 200,380 L 44,110 L 356,110 Z M 20,200 L 380,200 M 200,20 L 200,380"/></GeometryGroup></GeometryDrawing.Geometry></GeometryDrawing></DrawingGroup></DrawingBrush.Drawing></DrawingBrush>
+</ResourceDictionary>

@@ -51,6 +51,7 @@ public sealed class AppSettings
     public string LibraryFolder { get; set; } = "";
     public string Language { get; set; } = "default";
     public bool ReducedMotion { get; set; }
+    public bool HomuraTheme { get; set; }
     /// <summary>Block skins flagged by League's anti-skinhack scan. Off by default: every library skin is a repacked official skin and is always flagged.</summary>
     public bool EnforceSkinhackScan { get; set; }
     /// <summary>Always run the patcher host elevated. Off by default; it still elevates when League itself is set to run as administrator.</summary>

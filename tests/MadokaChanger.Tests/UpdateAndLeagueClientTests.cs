@@ -104,6 +104,17 @@ public sealed class ReleaseParserTests
 
 public sealed class UpdateReportTests
 {
+    [Fact] public void App_update_targets_the_running_install_and_requests_relaunch_without_dependency_setup()
+    {
+        var start=UpdateService.AppSetupStartInfo(@"C:\Downloaded updates\MadokaChanger-Setup-1.2.0.exe");
+        Assert.Equal(@"C:\Downloaded updates\MadokaChanger-Setup-1.2.0.exe",start.FileName);
+        Assert.True(start.UseShellExecute);
+        Assert.Contains("/VERYSILENT",start.Arguments);
+        Assert.Contains("/RELAUNCH=1",start.Arguments);
+        Assert.Contains("/SKIPLTK=1",start.Arguments);
+        Assert.Contains("/DIR=\""+Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory)+"\"",start.Arguments);
+    }
+
     private static ReleaseInfo App(string tag,bool withSetup=true)=>new(tag,ReleaseParser.ParseVersion(tag)!,"",withSetup?[new("MadokaChanger-Setup-"+tag.TrimStart('v')+".exe","https://github.com/a/b/s.exe",1,new string('a',64))]:[]);
     private static ReleaseInfo Ltk(string tag,bool withSetup=true)=>new(tag,ReleaseParser.ParseVersion(tag)!,"",withSetup?[new("LTK.Manager_"+tag.TrimStart('v')+"_x64-setup.exe","https://github.com/a/b/l.exe",1,new string('b',64))]:[]);
     private static readonly LtkInstall Signed=new(new Version(1,28,1),@"C:\LTK",true);

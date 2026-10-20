@@ -49,19 +49,40 @@
     </MultiDataTrigger>
    </Style.Triggers>
   </Style>
+  <Style x:Key="MascotButton" TargetType="Button">
+   <Setter Property="Background" Value="Transparent" />
+   <Setter Property="Cursor" Value="Hand" />
+   <Setter Property="MinWidth" Value="44" />
+   <Setter Property="MinHeight" Value="44" />
+   <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
+   <Setter Property="Template">
+    <Setter.Value>
+     <ControlTemplate TargetType="Button">
+      <Border Background="Transparent" CornerRadius="10">
+       <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+      </Border>
+      <ControlTemplate.Triggers>
+       <Trigger Property="IsMouseOver" Value="True"><Setter Property="Opacity" Value=".9" /></Trigger>
+       <Trigger Property="IsPressed" Value="True"><Setter Property="Opacity" Value=".7" /></Trigger>
+       <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".5" /></Trigger>
+      </ControlTemplate.Triggers>
+     </ControlTemplate>
+    </Setter.Value>
+   </Setter>
+  </Style>
   <Style x:Key="BrandMascotSize" TargetType="Image">
-   <Setter Property="Width" Value="168" />
-   <Setter Property="Height" Value="168" />
+   <Setter Property="Width" Value="144" />
+   <Setter Property="Height" Value="144" />
    <Setter Property="Margin" Value="0,14,0,0" />
    <Style.Triggers>
     <DataTrigger Binding="{Binding ShortLayout}" Value="True">
-     <Setter Property="Width" Value="112" />
-     <Setter Property="Height" Value="112" />
+     <Setter Property="Width" Value="96" />
+     <Setter Property="Height" Value="96" />
      <Setter Property="Margin" Value="0,10,0,0" />
     </DataTrigger>
     <DataTrigger Binding="{Binding CompactLayout}" Value="True">
-     <Setter Property="Width" Value="44" />
-     <Setter Property="Height" Value="44" />
+     <Setter Property="Width" Value="40" />
+     <Setter Property="Height" Value="40" />
      <Setter Property="Margin" Value="0" />
     </DataTrigger>
    </Style.Triggers>
@@ -124,12 +145,12 @@
  <Window.InputBindings>
   <KeyBinding Key="Escape" Command="{Binding BackCommand}" />
  </Window.InputBindings>
- <Grid Background="{StaticResource BackgroundBrush}" TextElement.Foreground="{StaticResource TextBrush}" TextElement.FontFamily="Segoe UI" TextElement.FontSize="14" x:Name="ApplicationLayout" SizeChanged="ViewportSizeChanged">
+ <Grid Background="{DynamicResource BackgroundBrush}" TextElement.Foreground="{DynamicResource TextBrush}" TextElement.FontFamily="Segoe UI" TextElement.FontSize="14" x:Name="ApplicationLayout" SizeChanged="ViewportSizeChanged">
   <Grid.ColumnDefinitions>
    <ColumnDefinition Width="{Binding SidebarWidth}" />
    <ColumnDefinition Width="*" />
   </Grid.ColumnDefinitions>
-  <Border Background="#15111F" BorderBrush="#2B2439" BorderThickness="0,0,1,0">
+  <Border Background="{DynamicResource SidebarBrush}" BorderBrush="{DynamicResource SubtleLineBrush}" BorderThickness="0,0,1,0">
    <Grid Margin="{Binding SidebarMargin}">
     <Grid.RowDefinitions>
      <RowDefinition Height="Auto" />
@@ -140,8 +161,10 @@
     </Grid.RowDefinitions>
     <StackPanel HorizontalAlignment="Center">
      <TextBlock Text="MadokaChanger" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" Style="{StaticResource WideOnly}" />
-     <TextBlock Text="MADOKA SKIN ATELIER" FontSize="9" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center" Margin="0,4,0,0" Style="{StaticResource WideOnly}" />
-     <Image x:Name="BrandMascot" Source="Assets/MadokaChibi.png" Stretch="Uniform" HorizontalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="Madoka chibi" Style="{StaticResource BrandMascotSize}" />
+     <TextBlock Text="{Binding AtelierLabel}" FontSize="9" Foreground="{DynamicResource MutedBrush}" HorizontalAlignment="Center" Margin="0,4,0,0" Style="{StaticResource WideOnly}" />
+     <Button Command="{Binding ToggleThemeCommand}" Style="{StaticResource MascotButton}" HorizontalAlignment="Center" ToolTip="{Binding MascotToggleLabel}" AutomationProperties.Name="{Binding MascotToggleLabel}" AutomationProperties.AutomationId="ToggleCharacterTheme">
+      <Image x:Name="BrandMascot" Source="{Binding MascotSource}" Stretch="Uniform" HorizontalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="{Binding MascotName}" AutomationProperties.AutomationId="BrandMascot" IsHitTestVisible="False" Style="{StaticResource BrandMascotSize}" />
+     </Button>
     </StackPanel>
     <StackPanel Grid.Row="2">
      <TextBlock Text="YOUR COLLECTION" Style="{StaticResource WideEyebrow}" Margin="15,0,0,12" />
@@ -150,8 +173,8 @@
        <Style TargetType="Button" BasedOn="{StaticResource NavButton}">
         <Style.Triggers>
          <DataTrigger Binding="{Binding IsSkins}" Value="True">
-          <Setter Property="Background" Value="#302238" />
-          <Setter Property="Foreground" Value="{StaticResource PinkBrush}" />
+          <Setter Property="Background" Value="{DynamicResource NavSelectionBrush}" />
+          <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
          </DataTrigger>
          <DataTrigger Binding="{Binding CompactLayout}" Value="True">
           <Setter Property="Padding" Value="8,14" />
@@ -167,8 +190,25 @@
        <Style TargetType="Button" BasedOn="{StaticResource NavButton}">
         <Style.Triggers>
          <DataTrigger Binding="{Binding IsCustom}" Value="True">
-          <Setter Property="Background" Value="#302238" />
-          <Setter Property="Foreground" Value="{StaticResource PinkBrush}" />
+          <Setter Property="Background" Value="{DynamicResource NavSelectionBrush}" />
+          <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+         </DataTrigger>
+         <DataTrigger Binding="{Binding CompactLayout}" Value="True">
+          <Setter Property="Padding" Value="8,14" />
+          <Setter Property="HorizontalContentAlignment" Value="Center" />
+          <Setter Property="FontSize" Value="20" />
+         </DataTrigger>
+        </Style.Triggers>
+       </Style>
+      </Button.Style>
+     </Button>
+     <Button Content="{Binding DuoNavigation}" Command="{Binding NavigateCommand}" CommandParameter="Duo" AutomationProperties.AutomationId="NavDuo" ToolTip="Duo">
+      <Button.Style>
+       <Style TargetType="Button" BasedOn="{StaticResource NavButton}">
+        <Style.Triggers>
+         <DataTrigger Binding="{Binding IsDuo}" Value="True">
+          <Setter Property="Background" Value="{DynamicResource NavSelectionBrush}" />
+          <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
          </DataTrigger>
          <DataTrigger Binding="{Binding CompactLayout}" Value="True">
           <Setter Property="Padding" Value="8,14" />
@@ -184,8 +224,8 @@
        <Style TargetType="Button" BasedOn="{StaticResource NavButton}">
         <Style.Triggers>
          <DataTrigger Binding="{Binding IsSettings}" Value="True">
-          <Setter Property="Background" Value="#302238" />
-          <Setter Property="Foreground" Value="{StaticResource PinkBrush}" />
+          <Setter Property="Background" Value="{DynamicResource NavSelectionBrush}" />
+          <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
          </DataTrigger>
          <DataTrigger Binding="{Binding CompactLayout}" Value="True">
           <Setter Property="Padding" Value="8,14" />
@@ -198,13 +238,13 @@
      </Button>
     </StackPanel>
     <Grid Grid.Row="3" IsHitTestVisible="False" VerticalAlignment="Bottom" Height="200" Opacity=".55" Style="{StaticResource WideOnly}">
-     <Ellipse Fill="{StaticResource MagicCircle}" Width="235" Height="235" HorizontalAlignment="Center" />
-     <TextBlock Text="✧" Foreground="#79638D" FontSize="28" HorizontalAlignment="Center" VerticalAlignment="Center" />
+     <Ellipse Fill="{DynamicResource MagicCircle}" Width="235" Height="235" HorizontalAlignment="Center" />
+     <TextBlock Text="✧" Foreground="{DynamicResource DecorationBrush}" FontSize="28" HorizontalAlignment="Center" VerticalAlignment="Center" />
     </Grid>
     <StackPanel Grid.Row="4" Style="{StaticResource WideOnly}">
-     <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,18" />
-     <TextBlock Text="A small wish. A new look." FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
-     <TextBlock Text="{Binding AppVersionText}" FontSize="10" Foreground="#9F91B5" Margin="0,8,0,0" />
+     <Border Height="1" Background="{DynamicResource LineBrush}" Margin="0,18" />
+     <TextBlock Text="A small wish. A new look." FontSize="11" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+     <TextBlock Text="{Binding AppVersionText}" FontSize="10" Foreground="{DynamicResource FootnoteBrush}" Margin="0,8,0,0" />
     </StackPanel>
    </Grid>
   </Border>
@@ -215,7 +255,7 @@
     <RowDefinition Height="*" />
     <RowDefinition Height="Auto" />
    </Grid.RowDefinitions>
-   <Border BorderBrush="#2B2439" BorderThickness="0,0,0,1" Style="{StaticResource CompactHeader}">
+   <Border BorderBrush="{DynamicResource SubtleLineBrush}" BorderThickness="0,0,0,1" Style="{StaticResource CompactHeader}">
     <Grid>
      <Grid.ColumnDefinitions>
       <ColumnDefinition Width="*" />
@@ -228,7 +268,7 @@
      <Button Grid.Column="1" Content="{Binding UpdateLabel}" Command="{Binding UpdateCommand}" Padding="20,10" VerticalAlignment="Center" Style="{StaticResource Primary}" ToolTip="Checks for a new MadokaChanger and LTK Manager, installs LTK Manager if it's missing, then refreshes the skin library." AutomationProperties.AutomationId="UpdateLibrary" />
     </Grid>
    </Border>
-   <Border Grid.Row="1" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Padding="16,8" Background="#211A2D">
+   <Border Grid.Row="1" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1" Padding="16,8" Background="{DynamicResource StatusPanelBrush}">
     <Grid>
      <Grid.ColumnDefinitions>
       <ColumnDefinition Width="*" />
@@ -237,10 +277,10 @@
      <TextBlock Text="{Binding Message}" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center">
       <TextBlock.Style>
        <Style TargetType="TextBlock">
-        <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
         <Style.Triggers>
          <DataTrigger Binding="{Binding HasError}" Value="True">
-          <Setter Property="Foreground" Value="{StaticResource ErrorBrush}" />
+          <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
          </DataTrigger>
         </Style.Triggers>
        </Style>
@@ -264,6 +304,67 @@
     </Border.Style>
    </Border>
    <Grid Grid.Row="2" x:Name="ContentArea" SizeChanged="ContentSizeChanged">
+    <ScrollViewer Visibility="{Binding IsDuo,Converter={StaticResource BoolVisibility}}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" AutomationProperties.AutomationId="DuoPage">
+     <StackPanel Margin="{Binding PageMargin}" MaxWidth="1100" HorizontalAlignment="Stretch">
+      <TextBlock Text="Duo" Style="{StaticResource ResponsiveHeading}" />
+      <TextBlock Text="Share champion and skin preparation with one partner." Style="{StaticResource Muted}" Margin="0,5,0,12" />
+      <Border Style="{StaticResource ResponsiveCard}" Padding="14" Margin="0,0,0,10">
+       <StackPanel>
+        <TextBlock Text="{Binding Duo.RelayHelp}" TextWrapping="Wrap" Style="{StaticResource Muted}" FontSize="11" AutomationProperties.AutomationId="DuoRelayHelp" />
+        <TextBlock Text="{Binding Duo.ConnectionStatus}" FontSize="12" FontWeight="SemiBold" Margin="0,8,0,0" AutomationProperties.AutomationId="DuoConnectionStatus" />
+        <Grid Margin="0,10,0,0">
+         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+         <Button Content="Create Party" Command="{Binding Duo.CreateCommand}" Style="{StaticResource Primary}" IsEnabled="{Binding Duo.CanCreate}" AutomationProperties.AutomationId="DuoCreate" />
+         <TextBox Grid.Column="1" Text="{Binding Duo.JoinCode,UpdateSourceTrigger=PropertyChanged}" MaxLength="4" Margin="10,0" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" FontSize="18" FontFamily="Consolas" AutomationProperties.Name="Four digit party code" AutomationProperties.AutomationId="DuoJoinCode" />
+         <TextBlock Grid.Column="1" Text="4-digit code" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" IsHitTestVisible="False">
+          <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Duo.JoinCode}" Value=""><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+         </TextBlock>
+         <Button Grid.Column="2" Content="Join" Command="{Binding Duo.JoinCommand}" IsEnabled="{Binding Duo.CanJoin}" AutomationProperties.AutomationId="DuoJoin" />
+        </Grid>
+        <Grid Margin="0,8,0,0" Visibility="{Binding Duo.HasParty,Converter={StaticResource BoolVisibility}}">
+         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+         <TextBlock Text="Party code" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+         <TextBlock Grid.Column="1" Text="{Binding Duo.PartyCode}" FontFamily="Consolas" FontSize="18" FontWeight="Bold" Margin="12,0" VerticalAlignment="Center" AutomationProperties.AutomationId="DuoPartyCode" />
+         <StackPanel Grid.Column="2" Orientation="Horizontal">
+          <Button Content="Copy Code" Command="{Binding Duo.CopyCodeCommand}" AutomationProperties.AutomationId="DuoCopyCode" />
+          <Button Content="Leave" Command="{Binding Duo.LeaveCommand}" IsEnabled="{Binding Duo.CanLeave}" Margin="8,0,0,0" AutomationProperties.AutomationId="DuoLeave" />
+         </StackPanel>
+        </Grid>
+        <TextBlock Text="{Binding Duo.Outcome}" TextWrapping="Wrap" Foreground="{DynamicResource GoldBrush}" FontSize="11" Margin="0,8,0,0" Visibility="{Binding Duo.HasOutcome,Converter={StaticResource BoolVisibility}}" AutomationProperties.AutomationId="DuoStatus" />
+       </StackPanel>
+      </Border>
+      <Grid>
+       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+       <Border Style="{StaticResource ResponsiveCard}" Padding="12">
+        <StackPanel>
+         <TextBlock Text="YOU" Style="{StaticResource Eyebrow}" />
+         <TextBlock Text="{Binding Duo.LocalChampion}" FontSize="16" FontWeight="SemiBold" Margin="0,4,0,0" AutomationProperties.AutomationId="DuoLocalChampion" />
+         <TextBlock Text="{Binding Duo.LocalPhase}" Style="{StaticResource Muted}" FontSize="11" Margin="0,2,0,8" />
+         <TextBlock Text="Desired" Foreground="{DynamicResource AccentBrush}" FontSize="10" />
+         <TextBlock Text="{Binding Duo.LocalDesired}" TextWrapping="Wrap" FontSize="11" Margin="0,2,0,6" AutomationProperties.AutomationId="DuoLocalDesired" />
+         <TextBlock Text="Prepared" Foreground="{DynamicResource AccentBrush}" FontSize="10" />
+         <TextBlock Text="{Binding Duo.LocalPrepared}" TextWrapping="Wrap" FontSize="11" Margin="0,2,0,3" AutomationProperties.AutomationId="DuoLocalPrepared" />
+         <TextBlock Text="{Binding Duo.LocalPreparation}" Style="{StaticResource Muted}" FontSize="10" TextWrapping="Wrap" AutomationProperties.AutomationId="DuoLocalPreparation" />
+        </StackPanel>
+       </Border>
+       <Border Grid.Column="2" Style="{StaticResource ResponsiveCard}" Padding="12">
+        <StackPanel>
+         <TextBlock Text="PARTNER" Style="{StaticResource Eyebrow}" />
+         <TextBlock Text="{Binding Duo.PeerPresence}" Style="{StaticResource Muted}" FontSize="10" Margin="0,4,0,0" />
+         <TextBlock Text="{Binding Duo.PeerChampion}" FontSize="16" FontWeight="SemiBold" Margin="0,4,0,0" AutomationProperties.AutomationId="DuoPeerChampion" />
+         <TextBlock Text="{Binding Duo.PeerPhase}" Style="{StaticResource Muted}" FontSize="11" Margin="0,2,0,8" />
+         <TextBlock Text="Desired" Foreground="{DynamicResource AccentBrush}" FontSize="10" />
+         <TextBlock Text="{Binding Duo.PeerDesired}" TextWrapping="Wrap" FontSize="11" Margin="0,2,0,6" AutomationProperties.AutomationId="DuoPeerDesired" />
+         <TextBlock Text="Prepared" Foreground="{DynamicResource AccentBrush}" FontSize="10" />
+         <TextBlock Text="{Binding Duo.PeerPrepared}" TextWrapping="Wrap" FontSize="11" Margin="0,2,0,3" AutomationProperties.AutomationId="DuoPeerPrepared" />
+         <TextBlock Text="{Binding Duo.PeerPreparation}" Style="{StaticResource Muted}" FontSize="10" TextWrapping="Wrap" AutomationProperties.AutomationId="DuoPeerPreparation" />
+         <TextBlock Text="{Binding Duo.PeerStatus}" Foreground="{DynamicResource GoldBrush}" FontSize="10" TextWrapping="Wrap" Margin="0,5,0,0" />
+        </StackPanel>
+       </Border>
+      </Grid>
+      <TextBlock Text="Duo shares selection metadata only. Both players need a compatible skin package installed; packages and League credentials are never shared." Style="{StaticResource Muted}" FontSize="10" TextWrapping="Wrap" Margin="0,8,0,0" />
+     </StackPanel>
+    </ScrollViewer>
     <Grid Margin="{Binding PageMargin}" Visibility="{Binding IsBrowser,Converter={StaticResource BoolVisibility}}">
      <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
@@ -316,7 +417,7 @@
        <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
       <TextBox x:Name="ChampionSearch" Text="{Binding Search,UpdateSourceTrigger=PropertyChanged}" ToolTip="Search champions by name" AutomationProperties.Name="Search champions" AutomationProperties.AutomationId="ChampionSearch" />
-      <TextBlock Text="⌕  Search champions" Margin="14,11" IsHitTestVisible="False" Foreground="{StaticResource MutedBrush}">
+      <TextBlock Text="⌕  Search champions" Margin="14,11" IsHitTestVisible="False" Foreground="{DynamicResource MutedBrush}">
        <TextBlock.Style>
         <Style TargetType="TextBlock">
          <Setter Property="Visibility" Value="Collapsed" />
@@ -363,14 +464,14 @@
                <Border CornerRadius="9,9,0,0" ClipToBounds="True">
                 <ui:AsyncImage Url="{Binding Portrait}" />
                </Border>
-               <Border Background="#D1100E18" HorizontalAlignment="Left" VerticalAlignment="Bottom" CornerRadius="0,6,0,0" Padding="7,4" Visibility="{Binding HasSelection,Converter={StaticResource BoolVisibility}}">
-                <TextBlock Text="{Binding SelectionLabel}" FontSize="10" Foreground="{StaticResource GoldBrush}" />
+               <Border Background="{DynamicResource BadgeBrush}" HorizontalAlignment="Left" VerticalAlignment="Bottom" CornerRadius="0,6,0,0" Padding="7,4" Visibility="{Binding HasSelection,Converter={StaticResource BoolVisibility}}">
+                <TextBlock Text="{Binding SelectionLabel}" FontSize="10" Foreground="{DynamicResource GoldBrush}" />
                </Border>
               </Grid>
               <TextBlock Text="{Binding Name}" Margin="12,12,30,13" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
              </StackPanel>
             </Button>
-            <Button Content="{Binding FavoriteLabel}" Command="{Binding Owner.FavoriteCommand}" CommandParameter="{Binding}" Style="{StaticResource Quiet}" Foreground="{StaticResource GoldBrush}" FontSize="18" Padding="6,2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,3,7" MinHeight="28" ToolTip="Toggle favorite" AutomationProperties.Name="Toggle favorite" />
+            <Button Content="{Binding FavoriteLabel}" Command="{Binding Owner.FavoriteCommand}" CommandParameter="{Binding}" Style="{StaticResource Quiet}" Foreground="{DynamicResource GoldBrush}" FontSize="18" Padding="6,2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,3,7" MinHeight="28" ToolTip="Toggle favorite" AutomationProperties.Name="Toggle favorite" />
            </Grid>
           </DataTemplate>
          </ItemsControl.ItemTemplate>
@@ -379,7 +480,7 @@
       </ListBox.ItemTemplate>
      </ListBox>
      <StackPanel Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="{Binding IsEmpty,Converter={StaticResource BoolVisibility}}">
-      <TextBlock Text="◇" FontSize="46" Foreground="{StaticResource PinkBrush}" HorizontalAlignment="Center" />
+      <TextBlock Text="◇" FontSize="46" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" />
       <TextBlock Text="The collection is waiting" FontSize="20" Margin="0,16,0,8" />
       <TextBlock Text="Connect to load champion metadata, then retry." Style="{StaticResource Muted}" />
       <Button Content="Load champion metadata" Command="{Binding RefreshMetadataCommand}" Margin="0,20,0,0" />
@@ -403,26 +504,26 @@
       <Button Content="←  Champions" Command="{Binding BackCommand}" Style="{StaticResource Quiet}" Padding="0,4,18,4" MinHeight="28" />
       <TextBlock Grid.Column="2" Text="SKIN SELECTION" Style="{StaticResource Eyebrow}" VerticalAlignment="Center" />
      </Grid>
-     <Border CornerRadius="16" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" ClipToBounds="True" Grid.Row="1">
+     <Border CornerRadius="16" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" ClipToBounds="True" Grid.Row="1">
       <Grid x:Name="SkinPreview" AutomationProperties.AutomationId="SkinPreview" MinHeight="80">
-       <Rectangle Fill="{StaticResource MagicCircle}" />
+       <Rectangle Fill="{DynamicResource MagicCircle}" />
        <ui:AsyncImage Url="{Binding Splash}" Style="{StaticResource PreviewArtwork}" />
        <Rectangle IsHitTestVisible="False">
         <Rectangle.Fill>
          <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
           <GradientStop Color="#00000000" Offset=".35" />
-          <GradientStop Color="#EE100E18" Offset="1" />
+          <GradientStop Color="{DynamicResource PreviewFadeColor}" Offset="1" />
          </LinearGradientBrush>
         </Rectangle.Fill>
        </Rectangle>
        <StackPanel VerticalAlignment="Bottom" Margin="20,0,20,12">
-        <TextBlock Text="{Binding ChampionName}" FontSize="12" Foreground="{StaticResource PinkBrush}" FontWeight="SemiBold" Style="{StaticResource TallOnly}" />
+        <TextBlock Text="{Binding ChampionName}" FontSize="12" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" Style="{StaticResource TallOnly}" />
         <TextBlock Text="{Binding SkinName}" FontWeight="SemiBold" Margin="0,7,0,0" Style="{StaticResource PreviewTitle}" />
-        <TextBlock Text="{Binding VariantName}" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,7,0,0" />
+        <TextBlock Text="{Binding VariantName}" FontSize="12" Foreground="{DynamicResource MutedBrush}" Margin="0,7,0,0" />
        </StackPanel>
        <Button Content="‹" Command="{Binding PreviousSkinCommand}" FontSize="26" Padding="14,1" HorizontalAlignment="Left" Style="{StaticResource PreviewArrow}" ToolTip="Previous skin" />
        <Button Content="›" Command="{Binding NextSkinCommand}" FontSize="26" Padding="14,1" HorizontalAlignment="Right" Style="{StaticResource PreviewArrow}" ToolTip="Next skin" />
-       <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="12" Padding="5" CornerRadius="8" Background="#D0181321" Visibility="{Binding HasChromaPreview,Converter={StaticResource BoolVisibility}}" IsHitTestVisible="False">
+       <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="12" Padding="5" CornerRadius="8" Background="{DynamicResource PreviewFrameBrush}" Visibility="{Binding HasChromaPreview,Converter={StaticResource BoolVisibility}}" IsHitTestVisible="False">
         <ui:AsyncImage Url="{Binding ChromaPreview}" ImageStretch="Uniform" Style="{StaticResource ChromaThumbnail}" />
        </Border>
       </Grid>
@@ -505,16 +606,16 @@
        </DockPanel>
       </Grid>
      </Border>
-     <Border Grid.Row="4" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="0,8,0,0" Margin="0,8,0,0">
+     <Border Grid.Row="4" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="0,8,0,0" Margin="0,8,0,0">
       <Grid>
        <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" />
         <ColumnDefinition Width="Auto" />
        </Grid.ColumnDefinitions>
        <StackPanel Margin="0,0,12,0">
-        <TextBlock Text="{Binding AvailabilityText}" Foreground="{StaticResource PinkBrush}" FontSize="11" TextTrimming="CharacterEllipsis" ToolTip="{Binding AvailabilityText}" />
+        <TextBlock Text="{Binding AvailabilityText}" Foreground="{DynamicResource AccentBrush}" FontSize="11" TextTrimming="CharacterEllipsis" ToolTip="{Binding AvailabilityText}" />
         <TextBlock Text="{Binding SavedText}" FontSize="11" TextTrimming="CharacterEllipsis" ToolTip="{Binding SavedText}" Margin="0,4,0,0" Style="{StaticResource TallOnly}" />
-        <TextBlock Text="{Binding ActiveText}" FontSize="10" TextTrimming="CharacterEllipsis" ToolTip="{Binding ActiveText}" Foreground="{StaticResource GoldBrush}" Margin="0,4,0,0" />
+        <TextBlock Text="{Binding ActiveText}" FontSize="10" TextTrimming="CharacterEllipsis" ToolTip="{Binding ActiveText}" Foreground="{DynamicResource GoldBrush}" Margin="0,4,0,0" />
        </StackPanel>
        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
         <Button Content="Apply Selection" Style="{StaticResource Primary}" Command="{Binding ApplySelectionCommand}" AutomationProperties.AutomationId="ApplySelection" />
@@ -574,11 +675,11 @@
               <TextBlock.Style>
                <Style TargetType="TextBlock">
                 <Setter Property="Text" Value="◇" />
-                <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
                 <Style.Triggers>
                  <DataTrigger Binding="{Binding Enabled}" Value="True">
                   <Setter Property="Text" Value="◆" />
-                  <Setter Property="Foreground" Value="{StaticResource PinkBrush}" />
+                  <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
                  </DataTrigger>
                 </Style.Triggers>
                </Style>
@@ -612,7 +713,7 @@
         </WrapPanel>
         <Border Style="{StaticResource ResponsiveCard}" Padding="16">
          <StackPanel>
-          <TextBlock Text="{Binding ConflictSummary}" FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource GoldBrush}" Margin="0,0,0,10" />
+          <TextBlock Text="{Binding ConflictSummary}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource GoldBrush}" Margin="0,0,0,10" />
           <ComboBox ItemsSource="{Binding ConflictChoices}" SelectedItem="{Binding ConflictChoice}" ToolTip="Reject blocks all conflicts. PreferRepository or PreferCustom explicitly chooses which source wins overlapping file overrides." AutomationProperties.Name="Conflict resolution" />
           <ScrollViewer MaxHeight="125" VerticalScrollBarVisibility="Auto" Margin="0,14,0,0">
            <TextBlock Text="{Binding SelectedCustomDetails}" Style="{StaticResource Muted}" FontSize="11" />
@@ -700,14 +801,14 @@
        <StackPanel>
         <TextBlock Text="Backend &amp; dependency status" FontSize="18" FontWeight="SemiBold" />
         <TextBlock Text="{Binding DependencyStatus}" Style="{StaticResource Muted}" FontSize="12" LineHeight="22" Margin="0,14,0,0" />
-        <TextBlock Text="{Binding PatcherDetail}" TextWrapping="Wrap" Foreground="{StaticResource GoldBrush}" Margin="0,12,0,0" />
+        <TextBlock Text="{Binding PatcherDetail}" TextWrapping="Wrap" Foreground="{DynamicResource GoldBrush}" Margin="0,12,0,0" />
         <Button Content="Save Settings" Command="{Binding SaveSettingsCommand}" Style="{StaticResource Primary}" HorizontalAlignment="Left" Margin="0,20,0,0" AutomationProperties.AutomationId="SaveSettings" />
        </StackPanel>
       </Border>
      </StackPanel>
     </ScrollViewer>
    </Grid>
-   <Border Grid.Row="3" BorderBrush="#30273F" BorderThickness="0,1,0,0" Background="#17131F">
+   <Border Grid.Row="3" BorderBrush="{DynamicResource FooterLineBrush}" BorderThickness="0,1,0,0" Background="{DynamicResource FooterBrush}">
     <StackPanel>
      <ProgressBar Value="{Binding Progress}" Visibility="{Binding IsBusy,Converter={StaticResource BoolVisibility}}" />
      <Grid Margin="16,8">
@@ -717,9 +818,9 @@
       </Grid.ColumnDefinitions>
       <StackPanel>
        <StackPanel Orientation="Horizontal">
-        <TextBlock Text="◆" Foreground="{StaticResource PinkBrush}" FontSize="12" Margin="0,0,8,0" />
+        <TextBlock Text="◆" Foreground="{DynamicResource AccentBrush}" FontSize="12" Margin="0,0,8,0" />
         <TextBlock Text="{Binding PatcherLabel}" FontWeight="SemiBold" FontSize="12" />
-        <TextBlock Text="{Binding GameStatus}" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="20,1,0,0" TextTrimming="CharacterEllipsis" MaxWidth="180">
+        <TextBlock Text="{Binding GameStatus}" Foreground="{DynamicResource MutedBrush}" FontSize="11" Margin="20,1,0,0" TextTrimming="CharacterEllipsis" MaxWidth="180">
          <TextBlock.Style>
           <Style TargetType="TextBlock">
            <Style.Triggers>
@@ -731,8 +832,8 @@
          </TextBlock.Style>
         </TextBlock>
        </StackPanel>
-       <TextBlock Text="{Binding Activity}" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,5,20,0" TextTrimming="CharacterEllipsis" Style="{StaticResource TallOnly}" />
-       <TextBlock Text="{Binding DisabledReason}" FontSize="10" Foreground="{StaticResource GoldBrush}" TextWrapping="Wrap" Visibility="{Binding HasDisabledReason,Converter={StaticResource BoolVisibility}}" Margin="0,5,20,0" />
+       <TextBlock Text="{Binding Activity}" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="0,5,20,0" TextTrimming="CharacterEllipsis" Style="{StaticResource TallOnly}" />
+       <TextBlock Text="{Binding DisabledReason}" FontSize="10" Foreground="{DynamicResource GoldBrush}" TextWrapping="Wrap" Visibility="{Binding HasDisabledReason,Converter={StaticResource BoolVisibility}}" Margin="0,5,20,0" />
       </StackPanel>
       <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
        <Button Content="Cancel" Command="{Binding CancelCommand}" Visibility="{Binding IsBusy,Converter={StaticResource BoolVisibility}}" Style="{StaticResource Quiet}" Margin="0,0,10,0" />

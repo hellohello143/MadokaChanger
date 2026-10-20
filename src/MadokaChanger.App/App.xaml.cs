@@ -37,6 +37,9 @@ public partial class App : Application
             .AddSingleton<MetadataProvider>().AddSingleton<ImageCache>().AddSingleton<IRepositorySource,GitHubRepository>()
             .AddSingleton<NativeBridge>().AddSingleton<PackageValidator>().AddSingleton<LibraryInstaller>()
             .AddSingleton<CustomSkinService>().AddSingleton<IGameEnvironment,SystemGameEnvironment>().AddSingleton<PatcherController>()
+            .AddSingleton<DuoOverlay>()
+            .AddSingleton<IDuoTransport>(_=>DuoConfiguration.CreateTransport(Environment.GetEnvironmentVariable("MADOKACHANGER_DUO_URL")))
+            .AddSingleton<PartyService>().AddSingleton<ILeagueStateSource>(_=>new LcuLeagueStateSource()).AddSingleton<DuoCoordinator>().AddSingleton<DuoViewModel>()
             .AddSingleton<UpdateService>().AddSingleton<LeagueClientApi>().AddSingleton<MainViewModel>().AddSingleton<MainWindow>();
         Services=services.BuildServiceProvider();
         return Services;

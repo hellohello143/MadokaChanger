@@ -57,6 +57,7 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly UpdateService updates;
     private readonly LeagueClientApi leagueClient;
     private readonly ILogger<MainViewModel> log;
+    public DuoViewModel Duo { get; }
     private Catalog? catalog;
     private UpdateReport? updateReport;
     private CancellationTokenSource? operation;
@@ -78,7 +79,7 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private CustomRow? selectedCustom;
     [ObservableProperty] private bool isBusy;
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SidebarWidth),nameof(SidebarMargin),nameof(PageMargin),nameof(SkinsNavigation),nameof(CustomNavigation),nameof(SettingsNavigation))]
+    [NotifyPropertyChangedFor(nameof(SidebarWidth),nameof(SidebarMargin),nameof(PageMargin),nameof(SkinsNavigation),nameof(CustomNavigation),nameof(DuoNavigation),nameof(SettingsNavigation))]
     private bool compactLayout;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PageMargin),nameof(SkinCarouselHeight),nameof(SkinThumbnailHeight),nameof(SkinThumbnailWidth))]
@@ -97,6 +98,9 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private string libraryFolder="";
     [ObservableProperty] private string language="default";
     [ObservableProperty] private bool reducedMotion;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MascotSource),nameof(MascotName),nameof(MascotToggleLabel),nameof(AtelierLabel))]
+    private bool homuraTheme;
     [ObservableProperty] private bool enforceSkinhackScan;
     [ObservableProperty] private bool elevatePatcher;
     [ObservableProperty] private ConflictChoice conflictChoice;
@@ -114,12 +118,18 @@ public sealed partial class MainViewModel : ObservableObject
     public Thickness PageMargin=>new(CompactLayout?16:28,ShortLayout?8:22,CompactLayout?16:28,ShortLayout?8:22);
     public string SkinsNavigation=>CompactLayout?"◇":"◇   Skins";
     public string CustomNavigation=>CompactLayout?"☷":"☷   Custom Skins";
+    public string DuoNavigation=>CompactLayout?"♡":"♡   Duo";
     public string SettingsNavigation=>CompactLayout?"⚙":"⚙   Settings";
+    public string MascotSource=>$"pack://application:,,,/MadokaChanger;component/Assets/{(HomuraTheme?"HomuraChibi":"MadokaChibi")}.png";
+    public string MascotName=>HomuraTheme?"Homura chibi":"Madoka chibi";
+    public string MascotToggleLabel=>HomuraTheme?"Switch to Madoka's pink theme":"Switch to Homura's purple and grey theme";
+    public string AtelierLabel=>HomuraTheme?"HOMURA SKIN ATELIER":"MADOKA SKIN ATELIER";
     public double CustomChampionWidth=>NarrowLayout?150:210;
     public double SkinCarouselHeight=>ShortLayout?76:112;
     public double SkinThumbnailHeight=>ShortLayout?36:60;
     public double SkinThumbnailWidth=>ShortLayout?88:112;
     public bool IsCustom=>Page=="Custom Skins";
+    public bool IsDuo=>Page=="Duo";
     public bool IsSettings=>Page=="Settings";
     public bool IsBrowser=>IsSkins && CurrentChampion is null;
     public bool IsDetail=>IsSkins && CurrentChampion is not null;
@@ -165,24 +175,39 @@ public sealed partial class MainViewModel : ObservableObject
             return $"Saved: {name}"+(saved.ChromaId is { } ch?$" · chroma {ch}":"")+(saved.Form is { } f?$" · form {f}":"");
         }
     }
-    public string ActiveText=>patcher.ActiveConfiguration is null?"Patcher stopped · saved changes take effect on Start":patcher.ActiveConfiguration==patcher.ConfigurationHash()?"Active configuration matches saved selections":"◆ Pending changes · Stop, then Start to rebuild";
+    public string ActiveText
+    {
+        get
+        {
+            if(Duo.HasParty)
+            {
+                if(Duo.PreparationState is "unavailable" or "error")return Duo.LocalStatus;
+                if(patcher.ActiveConfiguration is null)return "Duo party active · selections will be prepared on Start";
+                if(patcher.ActiveConfiguration==patcher.ConfigurationHash())return "Active configuration matches Duo selections";
+                return Duo.PreparationState=="pending"?"Duo changes pending · rebuild automatically when League closes":"Duo changes preparing · rebuild automatically when safe";
+            }
+            return patcher.ActiveConfiguration is null?"Patcher stopped · saved changes take effect on Start":patcher.ActiveConfiguration==patcher.ConfigurationHash()?"Active configuration matches saved selections":"◆ Pending changes · Stop, then Start to rebuild";
+        }
+    }
     public string SelectedCustomDetails=>SelectedCustom is { } c?$"{c.Name}\n{c.Model.Description}\n\n{c.Model.FileName}\n{c.Model.Overrides.Count:N0} file overrides · SHA-256 {c.Model.Sha256}\n\n{c.Status}":"Select an imported skin to inspect its package and conflicts.";
     public string CustomCount=>$"{CustomSkins.Count} imported skins";
     public string ConflictSummary { get { try {var conflicts=ConflictResolver.Find(patcher.Sources());return conflicts.Count==0?"No enabled file conflicts":$"{conflicts.Count:N0} file conflicts · choose a priority or disable conflicting skins";} catch(InvalidOperationException e) {return e.Message;} } }
-    public MainViewModel(StateStore store,MetadataProvider metadata,LibraryStore library,LibraryInstaller installer,CustomSkinService custom,PatcherController patcher,NativeBridge native,AppPaths paths,UpdateService updates,LeagueClientApi leagueClient,ILogger<MainViewModel> log)
+    public MainViewModel(StateStore store,MetadataProvider metadata,LibraryStore library,LibraryInstaller installer,CustomSkinService custom,PatcherController patcher,NativeBridge native,AppPaths paths,UpdateService updates,LeagueClientApi leagueClient,DuoViewModel duo,ILogger<MainViewModel> log)
     {
-        Store=store;this.metadata=metadata;this.library=library;this.installer=installer;this.custom=custom;this.patcher=patcher;this.native=native;this.paths=paths;this.updates=updates;this.leagueClient=leagueClient;this.log=log;
+        Store=store;this.metadata=metadata;this.library=library;this.installer=installer;this.custom=custom;this.patcher=patcher;this.native=native;this.paths=paths;this.updates=updates;this.leagueClient=leagueClient;Duo=duo;this.log=log;
+        Duo.PropertyChanged+=(_,_)=>OnPropertyChanged(nameof(ActiveText));
         patcher.StatusChanged+=s=>Application.Current.Dispatcher.InvokeAsync(()=> { OnPropertyChanged(nameof(PatcherLabel));OnPropertyChanged(nameof(PatcherDetail));NotifyActions();OnPropertyChanged(nameof(ActiveText)); });
     }
     public async Task InitializeAsync()
     {
         await Store.LoadAsync(); var s=Store.State.Settings;
+        HomuraTheme=s.HomuraTheme;ThemePalette.Apply(HomuraTheme);
         GameFolder=s.GameFolder.Length>0?s.GameFolder:GameLocator.Detect()??""; s.GameFolder=GameFolder;
         LibraryFolder=s.LibraryFolder; Language=s.Language; ReducedMotion=s.ReducedMotion; changing=true;ConflictChoice=Store.State.ConflictChoice;EnforceSkinhackScan=s.EnforceSkinhackScan;ElevatePatcher=s.ElevatePatcher;changing=false;
         await RunAsync(async ct=>
         {
             try {await library.LoadAsync(ct);} catch(Exception e) when(e is IOException or System.Text.Json.JsonException) {log.LogError(e,"Library manifest could not be loaded");Message=e.Message;}
-            catalog=await metadata.LoadAsync(Language,progress:new Progress<string>(m=>Activity=m),ct:ct);
+            catalog=await metadata.LoadAsync(Language,progress:new Progress<string>(m=>Activity=m),ct:ct);Duo.SetCatalog(catalog);
             RemoveClassicPreferences();
             PopulateChampions(); Message=metadata.IsOffline?"Offline · cached collection available":"Your collection is ready. Choose a champion to preview skins.";
             await Store.SaveAsync(ct); NotifyLibrary();
@@ -251,7 +276,7 @@ public sealed partial class MainViewModel : ObservableObject
     partial void OnFavoritesOnlyChanged(bool value)=>Refilter();
     partial void OnSavedOnlyChanged(bool value)=>Refilter();
     partial void OnCustomSearchChanged(string value)=>FilterCustomChampions();
-    partial void OnPageChanged(string value) {foreach(var p in new[]{nameof(IsSkins),nameof(IsCustom),nameof(IsSettings),nameof(IsBrowser),nameof(IsDetail)})OnPropertyChanged(p);}
+    partial void OnPageChanged(string value) {foreach(var p in new[]{nameof(IsSkins),nameof(IsCustom),nameof(IsDuo),nameof(IsSettings),nameof(IsBrowser),nameof(IsDetail)})OnPropertyChanged(p);}
     partial void OnIsBusyChanged(bool value)=>NotifyActions();
     partial void OnCustomChampionChanged(ChampionCard? value)=>RefreshCustom();
     partial void OnSelectedCustomChanged(CustomRow? value) {OnPropertyChanged(nameof(SelectedCustomDetails));OnPropertyChanged(nameof(HasCustomSelection));}
@@ -344,15 +369,15 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute=nameof(CanApply))] private async Task ApplySelectionAsync()
     {
         if(PreviewSelection is not { } s || !CanApply)return;
-        Store.State.Selections.TryGetValue(s.ChampionId,out var old);Store.State.Selections[s.ChampionId]=s;
-        if(!await PersistAsync()){if(old is null)Store.State.Selections.Remove(s.ChampionId);else Store.State.Selections[s.ChampionId]=old;NotifyPreview();return;}
-        foreach(var c in allChampions)c.Refresh();if(SavedOnly)Refilter();NotifyPreview();RefreshCustom();Message="Selection saved. "+ActiveText;HasError=false;
+        Selection? old;lock(Store.State.Selections){Store.State.Selections.TryGetValue(s.ChampionId,out old);Store.State.Selections[s.ChampionId]=s;}
+        if(!await PersistAsync()){lock(Store.State.Selections){if(old is null)Store.State.Selections.Remove(s.ChampionId);else Store.State.Selections[s.ChampionId]=old;}NotifyPreview();return;}
+        Duo.NotifyCommittedSelectionChanged();foreach(var c in allChampions)c.Refresh();if(SavedOnly)Refilter();NotifyPreview();RefreshCustom();Message="Selection saved. "+ActiveText;HasError=false;
     }
     [RelayCommand] private async Task ResetAsync()
     {
-        if(CurrentChampion is null)return;var id=CurrentChampion.Model.Id;Store.State.Selections.TryGetValue(id,out var old);Store.State.Selections.Remove(id);
-        if(!await PersistAsync()){if(old is not null)Store.State.Selections[id]=old;NotifyPreview();return;}
-        SelectedSkin=Skins.FirstOrDefault(s=>s.Model.IsBase);foreach(var c in allChampions)c.Refresh();if(SavedOnly)Refilter();NotifyPreview();RefreshCustom();Message="Champion override removed. "+ActiveText;HasError=false;
+        if(CurrentChampion is null)return;var id=CurrentChampion.Model.Id;Selection? old;lock(Store.State.Selections){Store.State.Selections.TryGetValue(id,out old);Store.State.Selections.Remove(id);}
+        if(!await PersistAsync()){if(old is not null)lock(Store.State.Selections)Store.State.Selections[id]=old;NotifyPreview();return;}
+        Duo.NotifyCommittedSelectionChanged();SelectedSkin=Skins.FirstOrDefault(s=>s.Model.IsBase);foreach(var c in allChampions)c.Refresh();if(SavedOnly)Refilter();NotifyPreview();RefreshCustom();Message="Champion override removed. "+ActiveText;HasError=false;
     }
     /// <summary>
     /// One button for everything: installs or updates LTK Manager, offers a newer MadokaChanger, then refreshes the skin library.
@@ -413,7 +438,7 @@ public sealed partial class MainViewModel : ObservableObject
     }
     [RelayCommand] private async Task RefreshMetadataAsync()=>await RunAsync(async ct=>
     {
-        catalog=await metadata.LoadAsync(Language,true,new Progress<string>(p=>Activity=p),ct);RemoveClassicPreferences();await Store.SaveAsync(ct);CurrentChampion=null;PopulateChampions();NotifyLibrary();Message=metadata.IsOffline?"Offline · using cached metadata":"Champion metadata refreshed.";
+        catalog=await metadata.LoadAsync(Language,true,new Progress<string>(p=>Activity=p),ct);Duo.SetCatalog(catalog);RemoveClassicPreferences();await Store.SaveAsync(ct);CurrentChampion=null;PopulateChampions();NotifyLibrary();Message=metadata.IsOffline?"Offline · using cached metadata":"Champion metadata refreshed.";
     });
     public async Task ImportFilesAsync(IEnumerable<string> files)
     {
@@ -439,9 +464,17 @@ public sealed partial class MainViewModel : ObservableObject
             if(game.Length>0&&!GameLocator.Validate(game))throw new InvalidOperationException("League folder must contain League of Legends.exe and DATA/FINAL.");
             var root=Path.GetFullPath(LibraryFolder);Directory.CreateDirectory(root);
             if(new[]{paths.Custom,paths.Metadata,paths.Images,paths.Temporary,paths.Overlay,paths.Logs}.Any(p=>root.Equals(p,StringComparison.OrdinalIgnoreCase)||root.StartsWith(p+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase)))throw new InvalidOperationException("Choose a separate library directory.");
-            Store.State.Settings=new(){GameFolder=game,LibraryFolder=root,Language=Language,ReducedMotion=ReducedMotion,EnforceSkinhackScan=EnforceSkinhackScan,ElevatePatcher=ElevatePatcher};await Store.SaveAsync();
+            Store.State.Settings=new(){GameFolder=game,LibraryFolder=root,Language=Language,ReducedMotion=ReducedMotion,HomuraTheme=HomuraTheme,EnforceSkinhackScan=EnforceSkinhackScan,ElevatePatcher=ElevatePatcher};await Store.SaveAsync();
             GameFolder=game;await library.LoadAsync();NotifyLibrary();OnPropertyChanged(nameof(GameStatus));Message="Settings saved. Refresh metadata after changing language. Existing libraries stay in their original folders.";HasError=false;
         }catch(Exception e){ShowError(e);}
+    }
+    partial void OnHomuraThemeChanged(bool value)=>ThemePalette.Apply(value);
+    [RelayCommand] private async Task ToggleThemeAsync()
+    {
+        var previous=HomuraTheme;
+        HomuraTheme=!previous;Store.State.Settings.HomuraTheme=HomuraTheme;
+        try {await Store.SaveAsync();}
+        catch(Exception e) {HomuraTheme=previous;Store.State.Settings.HomuraTheme=previous;ShowError(e);}
     }
     [RelayCommand] private void DetectGame() {GameFolder=GameLocator.Detect()??"";Message=GameFolder.Length>0?"League installation detected. Save settings to use it.":"No League installation found. Choose the Game folder manually.";}
     [RelayCommand] private void OpenLogs()=>OpenPath(paths.Logs);
@@ -464,5 +497,5 @@ public sealed partial class MainViewModel : ObservableObject
         finally {operation.Dispose();operation=null;IsBusy=false;Activity="Ready";OnPropertyChanged(nameof(PatcherLabel));NotifyPreview();}
     }
     private void ShowError(Exception e) {log.LogError(e,"Application operation failed");HasError=true;Message=e.Message;}
-    public async Task ShutdownAsync() {operation?.Cancel();await patcher.StopAsync();await Store.SaveAsync();}
+    public async Task ShutdownAsync() {operation?.Cancel();await Duo.ShutdownAsync();await patcher.StopAsync();await Store.SaveAsync();}
 }

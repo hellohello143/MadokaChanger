@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.2.0
+
+- Added Duo Mode: private two-person parties with four-digit codes, local League champion detection and supported skin/chroma/form selection synchronization. The deployed HTTPS relay is included by default.
+- Partner selections are temporary. Existing patcher sessions rebuild at safe points; active-game changes wait until the game closes, and stopped sessions remain stopped.
+- Matching exact packages and library versions are required. Same-champion conflicts keep the local selection; imported custom packages are not shared.
+- App updates now explicitly target the running installation folder and use a fully silent installer before reopening the app.
+
+- Made the sidebar chibi a little smaller in normal, short and compact layouts.
+- Clicking the chibi switches between Madoka's pink/plum appearance and a matching Homura chibi with purple accents and grey surfaces. Clicking again switches back.
+- The accessible mascot button supports keyboard use; the chosen theme is saved immediately, restored at startup and retained when saving other settings.
+- Theme changes update existing controls without resetting the current page, search, preview, favorites or saved selections.
+
+Validation includes automated Core and relay tests, off-screen WPF layouts, real-relay end-to-end verification and isolated installer checks. Live two-PC game rendering remains unverified. See `verification/DUO.md` and the release notes.
+
 ## 1.1.0
 
 - Downloaded library packages now use opaque local filenames and package name metadata, while original skin names, previews, chromas, forms, favorites and saved selections remain unchanged in the app.

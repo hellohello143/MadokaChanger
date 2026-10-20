@@ -127,11 +127,16 @@ public interface IGameEnvironment
 }
 public sealed class SystemGameEnvironment : IGameEnvironment { public bool IsOpen=>GameLocator.IsGameOpen(); }
 
-public sealed class PatcherController(NativeBridge native,StateStore state,LibraryStore library,AppPaths paths,OperationGate gate,ILogger<PatcherController> log,IGameEnvironment gameEnvironment)
+public sealed class PatcherController(NativeBridge native,StateStore state,LibraryStore library,AppPaths paths,OperationGate gate,ILogger<PatcherController> log,IGameEnvironment gameEnvironment,DuoOverlay? duo=null)
 {
     public event Action<PatcherStatus>? StatusChanged;
     public PatcherStatus Status { get; private set; } = new(PatcherState.Stopped,"Stopped");
     public string? ActiveConfiguration { get; private set; }
+    public IReadOnlyDictionary<int,Selection> PreparedSelections { get; private set; } = new Dictionary<int,Selection>();
+    public bool IsGameOpen => gameEnvironment.IsOpen;
+    private long stopRevision;
+    private readonly object preparationSync=new();
+    private CancellationTokenSource? preparationCancellation;
     private readonly SemaphoreSlim lifecycle=new(1,1);
     private Process? host;
     private ProcessJob? job;
@@ -143,43 +148,90 @@ public sealed class PatcherController(NativeBridge native,StateStore state,Libra
     public bool IsActive => Status.State is PatcherState.Running or PatcherState.Building or PatcherState.Starting;
     public string ConfigurationHash()
     {
-        var config=new { selections=state.State.Selections.Values.OrderBy(s=>s.ChampionId),custom=state.State.CustomSkins.Where(c=>c.Enabled).OrderBy(c=>c.Id).Select(c=>c.Sha256),priority=state.State.ConflictChoice,library=library.Manifest?.Commit };
+        return ConfigurationHash(EffectiveSelections().Values,state.State.CustomSkins.Where(c=>c.Enabled));
+    }
+    public IReadOnlyDictionary<int,Selection> EffectiveSelections()
+    {
+        if(duo is not null) return duo.Merge(state.State);
+        lock(state.State.Selections) return new Dictionary<int,Selection>(state.State.Selections);
+    }
+    private string ConfigurationHash(IEnumerable<Selection> selections,IEnumerable<CustomSkin> custom)
+    {
+        var config=new { selections=selections.OrderBy(s=>s.ChampionId),custom=custom.OrderBy(c=>c.Id).Select(c=>c.Sha256),priority=state.State.ConflictChoice,library=library.Manifest?.Commit };
         return Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(config,JsonFile.Options)));
     }
-    public List<OverrideSource> Sources()
+    public List<OverrideSource> Sources() => Sources(EffectiveSelections().Values,state.State.CustomSkins.Where(c=>c.Enabled));
+    private List<OverrideSource> Sources(IEnumerable<Selection> selections,IEnumerable<CustomSkin> custom)
     {
         var result=new List<OverrideSource>();
-        foreach(var selection in state.State.Selections.Values)
+        foreach(var selection in selections)
         {
             var matches=library.Find(selection);
             if(matches.Count!=1) throw new InvalidOperationException($"Saved selection for champion {selection.ChampionId} is unavailable or ambiguous. Reset it or install its package.");
             var p=matches[0]; result.Add(new("repo:"+p.Path,p.Name,false,p.Overrides));
         }
-        result.AddRange(state.State.CustomSkins.Where(c=>c.Enabled).Select(c=>new OverrideSource("custom:"+c.Id,c.Name,true,c.Overrides)));
+        result.AddRange(custom.Select(c=>new OverrideSource("custom:"+c.Id,c.Name,true,c.Overrides)));
         return result;
     }
     public async Task StartAsync(IProgress<string>? progress,CancellationToken ct)
     {
+        var expectedStop=Interlocked.Read(ref stopRevision);
         await lifecycle.WaitAsync(ct);
         try
         {
-            if(host is not null || IsActive) throw new InvalidOperationException("Stop the current session before rebuilding.");
+            if(expectedStop!=Interlocked.Read(ref stopRevision))throw new OperationCanceledException("Start was superseded by Stop.");
+            await StartCoreAsync(progress,ct,expectedStop:expectedStop);
+        }
+        finally { lifecycle.Release(); }
+    }
+    /// <summary>Rebuild only a session the user already started, holding its operation lease and lifecycle lock.</summary>
+    public async Task<bool> RebuildIfSafeAsync(CancellationToken ct)
+    {
+        var expectedStop=Interlocked.Read(ref stopRevision);
+        await lifecycle.WaitAsync(ct);
+        try
+        {
+            if(expectedStop!=Interlocked.Read(ref stopRevision) || Status.State!=PatcherState.Running || host is null || gameEnvironment.IsOpen || ActiveConfiguration==ConfigurationHash()) return false;
+            // Validate before stopping a usable scanning session.
+            ConflictResolver.Order(Sources(),state.State.ConflictChoice);
+            await StopHostAsync(); ActiveConfiguration=null; PreparedSelections=new Dictionary<int,Selection>();
+            if(expectedStop!=Interlocked.Read(ref stopRevision)) return false;
+            await StartCoreAsync(null,ct,rebuilding:true,expectedStop);
+            return true;
+        }
+        finally { lifecycle.Release(); }
+    }
+    private async Task StartCoreAsync(IProgress<string>? progress,CancellationToken ct,bool rebuilding=false,long? expectedStop=null)
+    {
+        using var preparation=CancellationTokenSource.CreateLinkedTokenSource(ct);
+        lock(preparationSync) preparationCancellation=preparation;
+        ct=preparation.Token;
+        try
+        {
+            ct.ThrowIfCancellationRequested();
+            if(expectedStop is { } beforeBuild && beforeBuild!=Interlocked.Read(ref stopRevision))throw new OperationCanceledException("Patcher stopped before preparation.");
+            if(host is not null || !rebuilding && IsActive) throw new InvalidOperationException("Stop the current session before rebuilding.");
             var patcherFiles=native.Available ? native.ResolvePatcher(refresh:true) : null;
             if(patcherFiles is null) throw new FileNotFoundException("The built-in backend is incomplete. Extract the full MadokaChanger download again, keeping its backend folder beside the app.");
             binaries=patcherFiles;
             var game=state.State.Settings.GameFolder;
             if(!GameLocator.Validate(game)) throw new DirectoryNotFoundException("Choose a League Game folder containing League of Legends.exe and DATA/FINAL.");
             if(gameEnvironment.IsOpen) throw new InvalidOperationException("Close the League game before building a new overlay.");
-            lease=await gate.EnterAsync(ct); stopping=false;
-            var config=ConfigurationHash(); var sources=ConflictResolver.Order(Sources(),state.State.ConflictChoice);
-            if(sources.Count==0) throw new InvalidOperationException("Apply a skin selection or enable a custom skin before starting.");
+            lease??=await gate.EnterAsync(ct); stopping=false;
+            var selections=EffectiveSelections(); var customSkins=state.State.CustomSkins.Where(c=>c.Enabled).ToArray();
+            var config=ConfigurationHash(selections.Values,customSkins); var sources=ConflictResolver.Order(Sources(selections.Values,customSkins),state.State.ConflictChoice);
+            if(sources.Count==0)
+            {
+                if(!rebuilding) throw new InvalidOperationException("Apply a skin selection or enable a custom skin before starting.");
+                lease?.Dispose();lease=null;Set(PatcherState.Stopped,"No overrides remain after Duo cleanup. Start when you choose another skin.");return;
+            }
             Set(PatcherState.Building,"Preparing selected packages");
             var session=Path.Combine(paths.Overlay,Guid.NewGuid().ToString("N")); Directory.CreateDirectory(session);
             var mods=new List<object>();
             foreach(var source in sources)
             {
                 ct.ThrowIfCancellationRequested(); string project;
-                if(source.IsCustom) project=state.State.CustomSkins.Single(c=>"custom:"+c.Id==source.Id).ProjectPath;
+                if(source.IsCustom) project=customSkins.Single(c=>"custom:"+c.Id==source.Id).ProjectPath;
                 else
                 {
                     var p=library.Manifest!.Packages.Single(p=>"repo:"+p.Path==source.Id);
@@ -192,7 +244,10 @@ public sealed class PatcherController(NativeBridge native,StateStore state,Libra
             var overlay=Path.Combine(session,"overlay");
             using(var result=await native.InvokeAsync(new{operation="build",game,overlay,state=Path.Combine(session,"state"),mods},ct,progress))
                 log.LogInformation("Built overlay: {Result}",result.RootElement.ToString());
-            ct.ThrowIfCancellationRequested(); Set(PatcherState.Starting,"Waiting for the LTK host to confirm scanning");
+            ct.ThrowIfCancellationRequested();
+            if(expectedStop is { } revision && revision!=Interlocked.Read(ref stopRevision))throw new OperationCanceledException("Patcher stopped during Duo preparation.");
+            if(gameEnvironment.IsOpen) throw new InvalidOperationException("League opened during preparation. Changes are pending; close the game and Start again.");
+            Set(PatcherState.Starting,"Waiting for the LTK host to confirm scanning");
             var started=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var process=new Process { StartInfo=new(patcherFiles.Host) { WorkingDirectory=patcherFiles.Directory,UseShellExecute=false,CreateNoWindow=true,RedirectStandardInput=true,RedirectStandardOutput=true,RedirectStandardError=true } };
             // Same rule as ltk-manager: --elevate (a UAC prompt) only when asked for or when League itself runs as admin.
@@ -203,21 +258,23 @@ public sealed class PatcherController(NativeBridge native,StateStore state,Libra
             log.LogInformation("Patcher: {Patcher}; elevate={Elevate} (opt_in={OptIn}, league_admin={LeagueAdmin}, app_elevated={AppElevated}); flags={Flags}",patcherFiles.Description,elevate,settings.ElevatePatcher,leagueAdmin,appElevated,flags);
             if(elevate) process.StartInfo.ArgumentList.Add("--elevate");
             redirected.Clear();
+            if(expectedStop is { } beforeLaunch && beforeLaunch!=Interlocked.Read(ref stopRevision))throw new OperationCanceledException("Patcher stopped during preparation.");
             if(!process.Start()) throw new IOException("LTK host could not start."); host=process;
             job=ProcessJob.Attach(process,0);
             monitor=MonitorAsync(process,started);
             foreach(var line in HostEvent.Configuration(overlay,flags)) await process.StandardInput.WriteLineAsync(line.AsMemory(),ct);
             await process.StandardInput.FlushAsync(ct);
             await started.Task.WaitAsync(TimeSpan.FromSeconds(30),ct);
-            ActiveConfiguration=config; Set(PatcherState.Running,"Running · scanning for League (in-game effects are not confirmed)");
-            await JsonFile.WriteAsync(Path.Combine(session,"configuration.json"),new{config,state.State.Selections,mods},ct);
+            if(expectedStop is { } afterLaunch && afterLaunch!=Interlocked.Read(ref stopRevision))throw new OperationCanceledException("Patcher stopped during preparation.");
+            ActiveConfiguration=config; PreparedSelections=new Dictionary<int,Selection>(selections); Set(PatcherState.Running,"Running · scanning for League (in-game effects are not confirmed)");
+            await JsonFile.WriteAsync(Path.Combine(session,"configuration.json"),new{config,selections,mods},ct);
         }
         catch(Exception e)
         {
-            await StopHostAsync(); lease?.Dispose(); lease=null; ActiveConfiguration=null;
+            await StopHostAsync(); lease?.Dispose(); lease=null; ActiveConfiguration=null; PreparedSelections=new Dictionary<int,Selection>();
             Set(e is OperationCanceledException ? PatcherState.Stopped : PatcherState.Error,e is OperationCanceledException ? "Build cancelled" : e.Message); throw;
         }
-        finally { lifecycle.Release(); }
+        finally {lock(preparationSync)if(ReferenceEquals(preparationCancellation,preparation))preparationCancellation=null;}
     }
     private async Task MonitorAsync(Process process,TaskCompletionSource started)
     {
@@ -254,13 +311,15 @@ public sealed class PatcherController(NativeBridge native,StateStore state,Libra
         }
         finally
         {
-            if(!stopping) { lease?.Dispose(); lease=null; ActiveConfiguration=null; job?.Dispose(); job=null; if(host==process) host=null; process.Dispose(); }
+            if(!stopping) { lease?.Dispose(); lease=null; ActiveConfiguration=null; PreparedSelections=new Dictionary<int,Selection>(); job?.Dispose(); job=null; if(host==process) host=null; process.Dispose(); }
         }
     }
     public async Task StopAsync()
     {
+        Interlocked.Increment(ref stopRevision);
+        lock(preparationSync)preparationCancellation?.Cancel();
         await lifecycle.WaitAsync();
-        try { await StopHostAsync(); ActiveConfiguration=null; lease?.Dispose(); lease=null; Set(PatcherState.Stopped,"Stopped"); }
+        try { await StopHostAsync(); ActiveConfiguration=null; PreparedSelections=new Dictionary<int,Selection>(); lease?.Dispose(); lease=null; Set(PatcherState.Stopped,"Stopped"); }
         finally { lifecycle.Release(); }
     }
     private async Task StopHostAsync()

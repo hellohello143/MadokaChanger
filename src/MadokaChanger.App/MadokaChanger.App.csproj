@@ -9,6 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Resource Include="Assets\MadokaChibi.png"/>
+    <Resource Include="Assets\HomuraChibi.png"/>
     <Resource Include="Assets\MadokaChanger.ico"/>
     <ProjectReference Include="../MadokaChanger.Core/MadokaChanger.Core.csproj"/>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0"/>
